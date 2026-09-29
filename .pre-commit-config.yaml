@@ -1,0 +1,24 @@
+# Pre-commit hooks for SPARK. Install once with:  pre-commit install
+# Config for ruff/black lives in pyproject.toml. Keep this adoptable on a large
+# existing tree: format + lint only, no aggressive rewrites.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff          # lint (E, F, W per pyproject)
+        args: [--fix]
+      - id: ruff-format   # not used — black is the formatter below
+        stages: [manual]
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=1024]   # block accidental model weights / captures
+      - id: check-merge-conflict

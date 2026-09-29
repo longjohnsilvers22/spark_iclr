@@ -1,0 +1,292 @@
+<mujoco model="panda_left">
+  <!--
+    LEFT Panda arm for bimanual scenes.
+    All bodies/joints/actuators/sites prefixed with "L_" to avoid name
+    clashes with the right arm. Must be included inside a parent body
+    that sets the base offset (e.g. pos="0 0.32 0").
+
+    The parent scene MUST set meshdir to the panda assets directory.
+    Meshes are shared (not prefixed) since MuJoCo mesh names can be
+    reused across geoms.
+  -->
+
+  <default>
+    <default class="panda_L">
+      <material specular="0.5" shininess="0.25"/>
+      <joint armature="0.1" damping="1" axis="0 0 1" range="-2.8973 2.8973"/>
+      <general dyntype="none" biastype="affine" ctrlrange="-2.8973 2.8973" forcerange="-87 87"/>
+      <default class="finger_L">
+        <joint axis="0 1 0" type="slide" range="0 0.04"/>
+      </default>
+      <default class="visual_L">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision_L">
+        <geom type="mesh" group="3"/>
+        <default class="fingertip_pad_collision_L1">
+          <geom type="box" size="0.0085 0.004 0.0085" pos="0 0.0055 0.0445"
+                friction="5 2 0.01" condim="6" solimp="0.95 0.99 0.005" solref="0.01 1"/>
+        </default>
+        <default class="fingertip_pad_collision_L2">
+          <geom type="box" size="0.003 0.002 0.003" pos="0.0055 0.002 0.05"
+                friction="5 2 0.01" condim="6"/>
+        </default>
+        <default class="fingertip_pad_collision_L3">
+          <geom type="box" size="0.003 0.002 0.003" pos="-0.0055 0.002 0.05"
+                friction="5 2 0.01" condim="6"/>
+        </default>
+        <default class="fingertip_pad_collision_L4">
+          <geom type="box" size="0.003 0.002 0.0035" pos="0.0055 0.002 0.0395"
+                friction="5 2 0.01" condim="6"/>
+        </default>
+        <default class="fingertip_pad_collision_L5">
+          <geom type="box" size="0.003 0.002 0.0035" pos="-0.0055 0.002 0.0395"
+                friction="5 2 0.01" condim="6"/>
+        </default>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <material class="panda_L" name="L_white" rgba="1 1 1 1"/>
+    <material class="panda_L" name="L_off_white" rgba="0.901961 0.921569 0.929412 1"/>
+    <material class="panda_L" name="L_black" rgba="0.25 0.25 0.25 1"/>
+    <material class="panda_L" name="L_green" rgba="0 1 0 1"/>
+    <material class="panda_L" name="L_light_blue" rgba="0.039216 0.541176 0.780392 1"/>
+
+    <mesh name="L_link0_c" file="link0.stl"/>
+    <mesh name="L_link1_c" file="link1.stl"/>
+    <mesh name="L_link2_c" file="link2.stl"/>
+    <mesh name="L_link3_c" file="link3.stl"/>
+    <mesh name="L_link4_c" file="link4.stl"/>
+    <mesh name="L_link5_c0" file="link5_collision_0.obj"/>
+    <mesh name="L_link5_c1" file="link5_collision_1.obj"/>
+    <mesh name="L_link5_c2" file="link5_collision_2.obj"/>
+    <mesh name="L_link6_c" file="link6.stl"/>
+    <mesh name="L_link7_c" file="link7.stl"/>
+    <mesh name="L_hand_c" file="hand.stl"/>
+
+    <mesh name="L_link0_0" file="link0_0.obj"/>
+    <mesh name="L_link0_1" file="link0_1.obj"/>
+    <mesh name="L_link0_2" file="link0_2.obj"/>
+    <mesh name="L_link0_3" file="link0_3.obj"/>
+    <mesh name="L_link0_4" file="link0_4.obj"/>
+    <mesh name="L_link0_5" file="link0_5.obj"/>
+    <mesh name="L_link0_7" file="link0_7.obj"/>
+    <mesh name="L_link0_8" file="link0_8.obj"/>
+    <mesh name="L_link0_9" file="link0_9.obj"/>
+    <mesh name="L_link0_10" file="link0_10.obj"/>
+    <mesh name="L_link0_11" file="link0_11.obj"/>
+    <mesh name="L_link1" file="link1.obj"/>
+    <mesh name="L_link2" file="link2.obj"/>
+    <mesh name="L_link3_0" file="link3_0.obj"/>
+    <mesh name="L_link3_1" file="link3_1.obj"/>
+    <mesh name="L_link3_2" file="link3_2.obj"/>
+    <mesh name="L_link3_3" file="link3_3.obj"/>
+    <mesh name="L_link4_0" file="link4_0.obj"/>
+    <mesh name="L_link4_1" file="link4_1.obj"/>
+    <mesh name="L_link4_2" file="link4_2.obj"/>
+    <mesh name="L_link4_3" file="link4_3.obj"/>
+    <mesh name="L_link5_0" file="link5_0.obj"/>
+    <mesh name="L_link5_1" file="link5_1.obj"/>
+    <mesh name="L_link5_2" file="link5_2.obj"/>
+    <mesh name="L_link6_0" file="link6_0.obj"/>
+    <mesh name="L_link6_1" file="link6_1.obj"/>
+    <mesh name="L_link6_2" file="link6_2.obj"/>
+    <mesh name="L_link6_3" file="link6_3.obj"/>
+    <mesh name="L_link6_4" file="link6_4.obj"/>
+    <mesh name="L_link6_5" file="link6_5.obj"/>
+    <mesh name="L_link6_6" file="link6_6.obj"/>
+    <mesh name="L_link6_7" file="link6_7.obj"/>
+    <mesh name="L_link6_8" file="link6_8.obj"/>
+    <mesh name="L_link6_9" file="link6_9.obj"/>
+    <mesh name="L_link6_10" file="link6_10.obj"/>
+    <mesh name="L_link6_11" file="link6_11.obj"/>
+    <mesh name="L_link6_12" file="link6_12.obj"/>
+    <mesh name="L_link6_13" file="link6_13.obj"/>
+    <mesh name="L_link6_14" file="link6_14.obj"/>
+    <mesh name="L_link6_15" file="link6_15.obj"/>
+    <mesh name="L_link6_16" file="link6_16.obj"/>
+    <mesh name="L_link7_0" file="link7_0.obj"/>
+    <mesh name="L_link7_1" file="link7_1.obj"/>
+    <mesh name="L_link7_2" file="link7_2.obj"/>
+    <mesh name="L_link7_3" file="link7_3.obj"/>
+    <mesh name="L_link7_4" file="link7_4.obj"/>
+    <mesh name="L_link7_5" file="link7_5.obj"/>
+    <mesh name="L_link7_6" file="link7_6.obj"/>
+    <mesh name="L_link7_7" file="link7_7.obj"/>
+    <mesh name="L_hand_0" file="hand_0.obj"/>
+    <mesh name="L_hand_1" file="hand_1.obj"/>
+    <mesh name="L_hand_2" file="hand_2.obj"/>
+    <mesh name="L_hand_3" file="hand_3.obj"/>
+    <mesh name="L_hand_4" file="hand_4.obj"/>
+    <mesh name="L_finger_0" file="finger_0.obj"/>
+    <mesh name="L_finger_1" file="finger_1.obj"/>
+  </asset>
+
+  <worldbody>
+    <body name="L_link0" pos="0 0.32 0" childclass="panda_L">
+      <inertial mass="0.629769" pos="-0.041018 -0.00014 0.049974"
+        fullinertia="0.00315 0.00388 0.004285 8.2904e-7 0.00015 8.2299e-6"/>
+      <geom mesh="L_link0_0" material="L_off_white" class="visual_L"/>
+      <geom mesh="L_link0_1" material="L_black" class="visual_L"/>
+      <geom mesh="L_link0_2" material="L_off_white" class="visual_L"/>
+      <geom mesh="L_link0_3" material="L_black" class="visual_L"/>
+      <geom mesh="L_link0_4" material="L_off_white" class="visual_L"/>
+      <geom mesh="L_link0_5" material="L_black" class="visual_L"/>
+      <geom mesh="L_link0_7" material="L_white" class="visual_L"/>
+      <geom mesh="L_link0_8" material="L_white" class="visual_L"/>
+      <geom mesh="L_link0_9" material="L_black" class="visual_L"/>
+      <geom mesh="L_link0_10" material="L_off_white" class="visual_L"/>
+      <geom mesh="L_link0_11" material="L_white" class="visual_L"/>
+      <geom mesh="L_link0_c" class="collision_L"/>
+      <body name="L_link1" pos="0 0 0.333">
+        <inertial mass="4.970684" pos="0.003875 0.002081 -0.04762"
+          fullinertia="0.70337 0.70661 0.0091170 -0.00013900 0.0067720 0.019169"/>
+        <joint name="L_joint1"/>
+        <geom material="L_white" mesh="L_link1" class="visual_L"/>
+        <geom mesh="L_link1_c" class="collision_L"/>
+        <body name="L_link2" quat="1 -1 0 0">
+          <inertial mass="0.646926" pos="-0.003141 -0.02872 0.003495"
+            fullinertia="0.0079620 2.8110e-2 2.5995e-2 -3.925e-3 1.0254e-2 7.04e-4"/>
+          <joint name="L_joint2" range="-1.7628 1.7628"/>
+          <geom material="L_white" mesh="L_link2" class="visual_L"/>
+          <geom mesh="L_link2_c" class="collision_L"/>
+          <body name="L_link3" pos="0 -0.316 0" quat="1 1 0 0">
+            <joint name="L_joint3"/>
+            <inertial mass="3.228604" pos="2.7518e-2 3.9252e-2 -6.6502e-2"
+              fullinertia="3.7242e-2 3.6155e-2 1.083e-2 -4.761e-3 -1.1396e-2 -1.2805e-2"/>
+            <geom mesh="L_link3_0" material="L_white" class="visual_L"/>
+            <geom mesh="L_link3_1" material="L_white" class="visual_L"/>
+            <geom mesh="L_link3_2" material="L_white" class="visual_L"/>
+            <geom mesh="L_link3_3" material="L_black" class="visual_L"/>
+            <geom mesh="L_link3_c" class="collision_L"/>
+            <body name="L_link4" pos="0.0825 0 0" quat="1 1 0 0">
+              <inertial mass="3.587895" pos="-5.317e-2 1.04419e-1 2.7454e-2"
+                fullinertia="2.5853e-2 1.9552e-2 2.8323e-2 7.796e-3 -1.332e-3 8.641e-3"/>
+              <joint name="L_joint4" range="-3.0718 -0.0698"/>
+              <geom mesh="L_link4_0" material="L_white" class="visual_L"/>
+              <geom mesh="L_link4_1" material="L_white" class="visual_L"/>
+              <geom mesh="L_link4_2" material="L_black" class="visual_L"/>
+              <geom mesh="L_link4_3" material="L_white" class="visual_L"/>
+              <geom mesh="L_link4_c" class="collision_L"/>
+              <body name="L_link5" pos="-0.0825 0.384 0" quat="1 -1 0 0">
+                <inertial mass="1.225946" pos="-1.1953e-2 4.1065e-2 -3.8437e-2"
+                  fullinertia="3.5549e-2 2.9474e-2 8.627e-3 -2.117e-3 -4.037e-3 2.29e-4"/>
+                <joint name="L_joint5"/>
+                <geom mesh="L_link5_0" material="L_black" class="visual_L"/>
+                <geom mesh="L_link5_1" material="L_white" class="visual_L"/>
+                <geom mesh="L_link5_2" material="L_white" class="visual_L"/>
+                <geom mesh="L_link5_c0" class="collision_L"/>
+                <geom mesh="L_link5_c1" class="collision_L"/>
+                <geom mesh="L_link5_c2" class="collision_L"/>
+                <body name="L_link6" quat="1 1 0 0">
+                  <inertial mass="1.666555" pos="6.0149e-2 -1.4117e-2 -1.0517e-2"
+                    fullinertia="1.964e-3 4.354e-3 5.433e-3 1.09e-4 -1.158e-3 3.41e-4"/>
+                  <joint name="L_joint6" range="-0.0175 3.7525"/>
+                  <geom mesh="L_link6_0" material="L_off_white" class="visual_L"/>
+                  <geom mesh="L_link6_1" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_2" material="L_black" class="visual_L"/>
+                  <geom mesh="L_link6_3" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_4" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_5" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_6" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_7" material="L_light_blue" class="visual_L"/>
+                  <geom mesh="L_link6_8" material="L_light_blue" class="visual_L"/>
+                  <geom mesh="L_link6_9" material="L_black" class="visual_L"/>
+                  <geom mesh="L_link6_10" material="L_black" class="visual_L"/>
+                  <geom mesh="L_link6_11" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_12" material="L_green" class="visual_L"/>
+                  <geom mesh="L_link6_13" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_14" material="L_black" class="visual_L"/>
+                  <geom mesh="L_link6_15" material="L_black" class="visual_L"/>
+                  <geom mesh="L_link6_16" material="L_white" class="visual_L"/>
+                  <geom mesh="L_link6_c" class="collision_L"/>
+                  <body name="L_link7" pos="0.088 0 0" quat="1 1 0 0">
+                    <inertial mass="7.35522e-01" pos="1.0517e-2 -4.252e-3 6.1597e-2"
+                      fullinertia="1.2516e-2 1.0027e-2 4.815e-3 -4.28e-4 -1.196e-3 -7.41e-4"/>
+                    <joint name="L_joint7"/>
+                    <geom mesh="L_link7_0" material="L_white" class="visual_L"/>
+                    <geom mesh="L_link7_1" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_2" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_3" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_4" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_5" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_6" material="L_black" class="visual_L"/>
+                    <geom mesh="L_link7_7" material="L_white" class="visual_L"/>
+                    <geom mesh="L_link7_c" class="collision_L"/>
+                    <body name="L_hand" pos="0 0 0.107" quat="0.9238795 0 0 -0.3826834">
+                      <inertial mass="0.73" pos="-0.01 0 0.03" diaginertia="0.001 0.0025 0.0017"/>
+                      <site name="L_pinch" pos="0 0 0.1034" size="0.005"
+                            rgba="0 0 1 0.5" group="4"/>
+                      <geom mesh="L_hand_0" material="L_off_white" class="visual_L"/>
+                      <geom mesh="L_hand_1" material="L_black" class="visual_L"/>
+                      <geom mesh="L_hand_2" material="L_black" class="visual_L"/>
+                      <geom mesh="L_hand_3" material="L_white" class="visual_L"/>
+                      <geom mesh="L_hand_4" material="L_off_white" class="visual_L"/>
+                      <geom mesh="L_hand_c" class="collision_L"/>
+                      <body name="L_left_finger" pos="0 0 0.0584">
+                        <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
+                        <joint name="L_finger_joint1" class="finger_L"/>
+                        <geom mesh="L_finger_0" material="L_off_white" class="visual_L"/>
+                        <geom mesh="L_finger_1" material="L_black" class="visual_L"/>
+                        <geom mesh="L_finger_0" class="collision_L"/>
+                        <geom class="fingertip_pad_collision_L1"/>
+                        <geom class="fingertip_pad_collision_L2"/>
+                        <geom class="fingertip_pad_collision_L3"/>
+                        <geom class="fingertip_pad_collision_L4"/>
+                        <geom class="fingertip_pad_collision_L5"/>
+                      </body>
+                      <body name="L_right_finger" pos="0 0 0.0584" quat="0 0 0 1">
+                        <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
+                        <joint name="L_finger_joint2" class="finger_L"/>
+                        <geom mesh="L_finger_0" material="L_off_white" class="visual_L"/>
+                        <geom mesh="L_finger_1" material="L_black" class="visual_L"/>
+                        <geom mesh="L_finger_0" class="collision_L"/>
+                        <geom class="fingertip_pad_collision_L1"/>
+                        <geom class="fingertip_pad_collision_L2"/>
+                        <geom class="fingertip_pad_collision_L3"/>
+                        <geom class="fingertip_pad_collision_L4"/>
+                        <geom class="fingertip_pad_collision_L5"/>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <tendon>
+    <fixed name="L_split">
+      <joint joint="L_finger_joint1" coef="0.5"/>
+      <joint joint="L_finger_joint2" coef="0.5"/>
+    </fixed>
+  </tendon>
+
+  <equality>
+    <joint joint1="L_finger_joint1" joint2="L_finger_joint2" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+  </equality>
+
+  <actuator>
+    <general class="panda_L" name="L_actuator1" joint="L_joint1" gainprm="4500" biasprm="0 -4500 -450"/>
+    <general class="panda_L" name="L_actuator2" joint="L_joint2" gainprm="4500" biasprm="0 -4500 -450"
+      ctrlrange="-1.7628 1.7628"/>
+    <general class="panda_L" name="L_actuator3" joint="L_joint3" gainprm="3500" biasprm="0 -3500 -350"/>
+    <general class="panda_L" name="L_actuator4" joint="L_joint4" gainprm="3500" biasprm="0 -3500 -350"
+      ctrlrange="-3.0718 -0.0698"/>
+    <general class="panda_L" name="L_actuator5" joint="L_joint5" gainprm="2000" biasprm="0 -2000 -200" forcerange="-12 12"/>
+    <general class="panda_L" name="L_actuator6" joint="L_joint6" gainprm="2000" biasprm="0 -2000 -200" forcerange="-12 12"
+      ctrlrange="-0.0175 3.7525"/>
+    <general class="panda_L" name="L_actuator7" joint="L_joint7" gainprm="2000" biasprm="0 -2000 -200" forcerange="-12 12"/>
+    <general class="panda_L" name="L_actuator8" tendon="L_split" forcerange="-2000 2000" ctrlrange="0 255"
+      gainprm="0.3137254902 0 0" biasprm="0 -2000 -200"/>
+  </actuator>
+
+  <contact>
+    <exclude body1="L_link0" body2="L_link1"/>
+  </contact>
+</mujoco>

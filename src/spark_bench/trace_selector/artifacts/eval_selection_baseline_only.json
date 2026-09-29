@@ -1,0 +1,62 @@
+{
+  "artifact": "src/spark_bench/trace_selector/artifacts/trace_lr_baseline_only.json",
+  "disagreeing_pairs": {
+    "n": 67,
+    "n_dropped_no_proxy": 0,
+    "n_proxy_identical_to_winner": 31,
+    "selection_accuracy_model": 0.5149,
+    "selection_accuracy_model_distinguishable_only": 0.5278,
+    "n_distinguishable": 36,
+    "baseline_random": 0.5,
+    "baseline_always_candidate0": 0.0,
+    "baseline_always_candidate0_note": "0% BY CONSTRUCTION: recorded disagreements only exist when candidate 0 failed (early-exit logging)",
+    "baseline_kinematic_shield": null,
+    "baseline_kinematic_shield_note": "not reconstructable offline: shield needs per-trial keypoint 3D positions (det_map), which P0-a logs do not persist",
+    "per_suite": {
+      "spatial": {
+        "n": 18,
+        "acc": 0.7222
+      },
+      "object": {
+        "n": 45,
+        "acc": 0.4333
+      },
+      "goal": {
+        "n": 4,
+        "acc": 0.5
+      }
+    }
+  },
+  "implied_arm_c_prime": {
+    "n_shadow_trials": 589,
+    "model_selection_sr": 0.4448,
+    "always_candidate0_sr": 0.4261,
+    "random_pick_sr": 0.483,
+    "actual_sequential_shadow_sr": 0.5399,
+    "n_censored_trials": 0,
+    "note": "winner-0 trials contribute a K=1 decision (the only recorded plan succeeded); sequential shadow SR is the oracle-with-restore upper bound actually achieved by the arm"
+  },
+  "gbt_reference": {
+    "gbt_selection_accuracy": 0.4851,
+    "n_pairs": 67,
+    "n_distinguishable": 36,
+    "note": "baseline-arm-trained HistGBT reference, not deployable"
+  },
+  "armc_cross_run_pairs": {
+    "n_disagreeing_cross_run_pairs": 142,
+    "selection_accuracy_model_LOTO": 0.7254,
+    "baseline_random": 0.5,
+    "baseline_shortest_plan": 0.4296,
+    "per_perturbation": {
+      "position": {
+        "n": 102,
+        "acc": 0.7843
+      },
+      "task": {
+        "n": 40,
+        "acc": 0.575
+      }
+    },
+    "note": "bidirectional pairs from same-init-state cross-run replays; leave-one-task-out LR; outcome flips can also reflect perception noise, so 0.5 is the null"
+  }
+}

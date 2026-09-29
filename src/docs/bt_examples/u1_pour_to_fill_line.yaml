@@ -1,0 +1,30 @@
+# U1: Pour water from kettle into mug until half-full
+# Vision-grounded continuous predicate - terminates on SAM3 fluid-mask
+# threshold rather than fixed dwell time. Differentiator vs MolmoAct
+# pour_tea (open-loop) and pi₀.5 (no continuous predicate).
+task: pour water from the kettle into the mug until about half full
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "kettle handle"
+        prefer_angled: false
+        force: 25
+        target_width: 0.030
+        grip_end: back
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.20}
+    - type: pour_to_level
+      params:
+        source_label: "kettle"
+        target_label: "mug"
+        fluid_label: "water"
+        target_fill_fraction: 0.50
+        max_tilt_rad: 1.8
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.20}
+    - type: move_to_keypoint
+      params: {keypoint_label: "kettle base", offset_z: 0.05}
+    - type: release
+      params: {tilt_angle: 0, roll_sign: 0}

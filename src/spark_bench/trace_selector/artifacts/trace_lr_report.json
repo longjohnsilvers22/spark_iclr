@@ -1,0 +1,235 @@
+{
+  "n_rows": 3916,
+  "base_rate": 0.3312,
+  "n_features_usable": 59,
+  "dropped_features": [
+    "verify_has_on",
+    "verify_has_absent",
+    "verify_has_removed_from",
+    "instr_has_both",
+    "instr_has_then"
+  ],
+  "ablations": {
+    "both": {
+      "logreg": {
+        "auroc": 0.6091,
+        "auprc": 0.3797
+      },
+      "gbt": {
+        "auroc": 0.6453,
+        "auprc": 0.4282
+      }
+    },
+    "plan": {
+      "logreg": {
+        "auroc": 0.4635,
+        "auprc": 0.2988
+      },
+      "gbt": {
+        "auroc": 0.5222,
+        "auprc": 0.3552
+      }
+    },
+    "grounding": {
+      "logreg": {
+        "auroc": 0.6334,
+        "auprc": 0.406
+      },
+      "gbt": {
+        "auroc": 0.648,
+        "auprc": 0.4243
+      }
+    }
+  },
+  "held_out_suite": {
+    "both/goal": {
+      "logreg": {
+        "auroc": 0.6782,
+        "auprc": 0.2251,
+        "n": 836,
+        "base_rate": 0.1411
+      },
+      "gbt": {
+        "auroc": 0.6217,
+        "auprc": 0.1878,
+        "n": 836,
+        "base_rate": 0.1411
+      }
+    },
+    "both/object": {
+      "logreg": {
+        "auroc": 0.516,
+        "auprc": 0.3885,
+        "n": 731,
+        "base_rate": 0.3611
+      },
+      "gbt": {
+        "auroc": 0.5583,
+        "auprc": 0.4468,
+        "n": 731,
+        "base_rate": 0.3611
+      }
+    },
+    "both/spatial": {
+      "logreg": {
+        "auroc": 0.5791,
+        "auprc": 0.4481,
+        "n": 2349,
+        "base_rate": 0.3895
+      },
+      "gbt": {
+        "auroc": 0.5514,
+        "auprc": 0.4386,
+        "n": 2349,
+        "base_rate": 0.3895
+      }
+    },
+    "plan/goal": {
+      "logreg": {
+        "auroc": 0.6525,
+        "auprc": 0.1923,
+        "n": 836,
+        "base_rate": 0.1411
+      },
+      "gbt": {
+        "auroc": 0.7535,
+        "auprc": 0.2693,
+        "n": 836,
+        "base_rate": 0.1411
+      }
+    },
+    "plan/object": {
+      "logreg": {
+        "auroc": 0.5368,
+        "auprc": 0.3901,
+        "n": 731,
+        "base_rate": 0.3611
+      },
+      "gbt": {
+        "auroc": 0.574,
+        "auprc": 0.471,
+        "n": 731,
+        "base_rate": 0.3611
+      }
+    },
+    "plan/spatial": {
+      "logreg": {
+        "auroc": 0.4711,
+        "auprc": 0.3977,
+        "n": 2349,
+        "base_rate": 0.3895
+      },
+      "gbt": {
+        "auroc": 0.5153,
+        "auprc": 0.3962,
+        "n": 2349,
+        "base_rate": 0.3895
+      }
+    },
+    "grounding/goal": {
+      "logreg": {
+        "auroc": 0.5022,
+        "auprc": 0.1522,
+        "n": 836,
+        "base_rate": 0.1411
+      },
+      "gbt": {
+        "auroc": 0.593,
+        "auprc": 0.1748,
+        "n": 836,
+        "base_rate": 0.1411
+      }
+    },
+    "grounding/object": {
+      "logreg": {
+        "auroc": 0.493,
+        "auprc": 0.3801,
+        "n": 731,
+        "base_rate": 0.3611
+      },
+      "gbt": {
+        "auroc": 0.5915,
+        "auprc": 0.4543,
+        "n": 731,
+        "base_rate": 0.3611
+      }
+    },
+    "grounding/spatial": {
+      "logreg": {
+        "auroc": 0.5884,
+        "auprc": 0.4495,
+        "n": 2349,
+        "base_rate": 0.3895
+      },
+      "gbt": {
+        "auroc": 0.5621,
+        "auprc": 0.4441,
+        "n": 2349,
+        "base_rate": 0.3895
+      }
+    }
+  },
+  "top_coefficients": [
+    {
+      "feature": "verify_has_inside",
+      "coef": 1.52991
+    },
+    {
+      "feature": "n_unique_labels",
+      "coef": -1.086588
+    },
+    {
+      "feature": "instr_open_close",
+      "coef": -0.80236
+    },
+    {
+      "feature": "place_hint_sim",
+      "coef": 0.740698
+    },
+    {
+      "feature": "n_validator_snaps",
+      "coef": -0.73897
+    },
+    {
+      "feature": "n_open_drawer",
+      "coef": -0.727468
+    },
+    {
+      "feature": "n_verify_clauses",
+      "coef": 0.607698
+    },
+    {
+      "feature": "max_offset_z",
+      "coef": -0.580295
+    },
+    {
+      "feature": "mean_offset_z",
+      "coef": -0.557463
+    },
+    {
+      "feature": "det_place_count",
+      "coef": 0.467713
+    },
+    {
+      "feature": "det_pick_count",
+      "coef": 0.446325
+    },
+    {
+      "feature": "place_offset_z",
+      "coef": -0.430441
+    },
+    {
+      "feature": "det_pick_place_dist",
+      "coef": -0.41519
+    },
+    {
+      "feature": "det_place_conf",
+      "coef": 0.400319
+    },
+    {
+      "feature": "n_retry",
+      "coef": 0.388948
+    }
+  ],
+  "artifact": "src/spark_bench/trace_selector/artifacts/trace_lr.json"
+}

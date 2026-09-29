@@ -1,0 +1,88 @@
+# SPARK-real upstream reference repos (driver development)
+#
+# These are the *upstream* libraries the spark_real robot drivers wrap.
+# They are NOT runtime dependencies; the drivers pip-install the upstream
+# packages directly (see src/spark_real/robots/{franka,g1}/README.md).
+#
+# These reference clones exist so a developer building or extending the
+# driver shims can read the upstream API source against the same commits
+# the shims were written against.
+#
+# Usage:
+#   mkdir -p ~/spark/external
+#   cd ~/spark/external
+#   vcs import --shallow < ../spark_real.repos
+#
+# These paths are gitignored (see .gitignore: `external/`).
+
+repositories:
+  # franky - Python wrapper around libfranka for Franka FR3 / Panda.
+  # Used by: src/spark_real/robots/franka/franka_driver.py
+  # Runtime install: pip install franky-control==1.1.3
+  #   (PyPI dist name is `franky-control`, not `franky`; the import is still
+  #   `import franky`. Bundles libfranka via auditwheel, so no apt step.)
+  franka_upstream:
+    type: git
+    url: https://github.com/TimSchneider42/franky.git
+    version: v1.1.3
+
+  # franka_description - Official URDF + meshes for FR3 / FER / FP3.
+  # Used by: spark_real configs (urdf.path), MoveIt2 collision-aware planning,
+  #          perception coordinate frames, and any kinematics consumer.
+  # Not a runtime dependency for franky-based control (libfranka ships its own
+  # internal kinematics), but required for any code path that reasons about
+  # robot geometry in Python (pinocchio, urdf_parser_py, kdl, etc.) or MoveIt2.
+  # Apache-2.0.
+  # The pre-generated URDFs in src/spark_real/robots/franka/urdf/ reference
+  # meshes by absolute path into this clone; if you move or delete this
+  # directory, re-run scripts/regenerate_fr3_urdf.sh.
+  franka_description:
+    type: git
+    url: https://github.com/frankaemika/franka_description.git
+    version: main
+
+  # unitree_sdk2_python - DDS-based SDK for Unitree G1 humanoid.
+  # Used by: src/spark_real/robots/g1/g1_driver.py
+  # Runtime install (no-sudo, recommended on Python 3.12):
+  #     pip install cyclonedds                         # 11.0.x wheel bundles libcyclonedds
+  #     pip install --no-deps -e ~/spark/external/unitree_upstream
+  #   The upstream pins `cyclonedds==0.10.2` which has no py3.12 wheel and
+  #   would build from source against an apt-installed libcyclonedds. The
+  #   `--no-deps` install bypasses the pin; the 7 modules g1_driver imports
+  #   (core.channel, idl.unitree_hg.msg.dds_, idl.default, utils.crc,
+  #   utils.thread, g1.loco.g1_loco_client, g1.arm.g1_arm_action_client)
+  #   all load cleanly against cyclonedds 11.0.x (verified 2026-05-12).
+  #
+  # Apt fallback (only if the cyclonedds wheel ever stops working):
+  #     sudo apt install cyclonedds-tools libcyclonedds-dev
+  #     pip install -e ~/spark/external/unitree_upstream
+  #
+  # The g1_driver shim degrades to stub-only mode if either import fails,
+  # so the spark_real server still boots without the SDK.
+  unitree_upstream:
+    type: git
+    url: https://github.com/unitreerobotics/unitree_sdk2_python.git
+    version: d72a951
+
+  # Fabrica - CoRL 2025 (Oral, Best Paper) bimanual furniture assembly.
+  # Used by: bimanual handoff motion planning (planning/robot/motion_plan_arm.py
+  #          ArmMotionPlanner) and the Grasp dataclass (per-role collision sets).
+  # NOT a pip package - clone into src/fabrica/ and import the pure-planning
+  # subset directly. Submodules (libigl, pybind11) are only needed for the
+  # redmax C++ simulator; skip with `vcs import --skip-existing` to avoid.
+  # See: src/docs/bimanual_design.md (section 8 Adopted external code).
+  fabrica:
+    type: git
+    url: https://github.com/yunshengtian/Fabrica.git
+    version: main
+
+  # Omni-Scan (IHGS) - IROS 2025 bimanual in-hand 3D scanning + handoff.
+  # Used by: bimanual perception refinement (KinematicCameraOptimizer) and
+  #          post-handoff point-cloud registration (compute_icp). Optional -
+  #          the bimanual stack works without it; provides photometric
+  #          calibration polish when needed.
+  # See: src/docs/bimanual_calibration.md (method 3).
+  omniscan:
+    type: git
+    url: https://github.com/TianshuangQiu/IHGS.git
+    version: main

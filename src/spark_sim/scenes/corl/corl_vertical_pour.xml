@@ -1,0 +1,132 @@
+<mujoco model="corl_vertical_pour">
+  <!--
+    CoRL vertical-tilt pour demo.
+      - Panda arm at world origin.
+      - Tall cup: 50mm OD (25mm radius), 130mm tall. Narrow enough for
+        reliable top-down grasp (Panda gripper 80mm opening >> 50mm cup).
+        Placed at (0.45, 0.18) for good top-down reachability.
+      - Bowl: 200mm OD octagonal, 80mm tall. At (0.45, -0.18).
+      - Cameras: agentview, sideview, topview.
+
+    Trajectory:
+      1. Top-down grasp on cup (vertical approach from above)
+      2. Lift straight up to safe ceiling
+      3. Transport horizontally to above bowl
+      4. Tilt wrist 45 degrees about local X to pour
+      5. Hold pour
+      6. Untilt back to top-down
+      7. Transport back to cup origin
+      8. Descend, release cup
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="cup_mat" rgba="0.95 0.95 0.92 1"
+              specular="0.2" shininess="0.15" reflectance="0.05"/>
+    <material name="bowl_mat" rgba="0.35 0.45 0.7 1"
+              specular="0.6" shininess="0.4" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table at z=0 in robot frame. -->
+    <body name="table" pos="0.45 0 -0.01">
+      <geom name="table_top" type="box" size="0.40 0.40 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Tall narrow cup: 50mm OD (25mm radius), 130mm tall (65mm half-height).
+      Mass 0.12 kg. High friction + soft contact for reliable grip.
+      Bottom on table at z=0; centre z=0.065; top z=0.130.
+      Placed at (0.45, +0.18): close enough for good top-down IK,
+      offset in Y for clear transit path to bowl.
+    -->
+    <body name="cup" pos="0.45 0.18 0.0">
+      <freejoint name="cup_free"/>
+      <geom name="cup_geom" type="cylinder" size="0.025 0.065"
+            pos="0 0 0.065" material="cup_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0.065" mass="0.12"
+                diaginertia="0.00020 0.00020 0.00008"/>
+    </body>
+
+    <!--
+      Bowl: 200mm OD, 80mm tall. At (0.45, -0.18).
+    -->
+    <body name="bowl" pos="0.45 -0.18 0.005">
+      <geom name="bowl_bottom" type="cylinder" size="0.1 0.005"
+            pos="0 0 0" material="bowl_mat"
+            condim="6" friction="0.9 0.4 0.001"/>
+      <!-- Octagonal wall -->
+      <geom name="bowl_w0" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0975 0 0.0425" euler="0 0 1.5708" material="bowl_mat"/>
+      <geom name="bowl_w1" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 0.0689 0.0425" euler="0 0 2.3562" material="bowl_mat"/>
+      <geom name="bowl_w2" type="box" size="0.039 0.0025 0.0375"
+            pos="0 0.0975 0.0425" euler="0 0 3.1416" material="bowl_mat"/>
+      <geom name="bowl_w3" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 0.0689 0.0425" euler="0 0 3.9270" material="bowl_mat"/>
+      <geom name="bowl_w4" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0975 0 0.0425" euler="0 0 1.5708" material="bowl_mat"/>
+      <geom name="bowl_w5" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 -0.0689 0.0425" euler="0 0 2.3562" material="bowl_mat"/>
+      <geom name="bowl_w6" type="box" size="0.039 0.0025 0.0375"
+            pos="0 -0.0975 0.0425" euler="0 0 3.1416" material="bowl_mat"/>
+      <geom name="bowl_w7" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 -0.0689 0.0425" euler="0 0 3.9270" material="bowl_mat"/>
+      <site name="bowl_target" pos="0 0 0.05" size="0.08 0.08 0.001"
+            rgba="0 0 0 0" type="box"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="cam_target" pos="0.4 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.4 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.45 -1.0 0.45">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.4 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785 0.04 0.04  0.45 0.18 0.065 1 0 0 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785 255"/>
+  </keyframe>
+</mujoco>

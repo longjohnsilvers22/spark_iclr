@@ -1,0 +1,28 @@
+# CoRL F4: fold cloth.
+# Pre-baked BT score dispatched through the production skill registry.
+# Exercises:
+#   - grasp_se3 (strategy=top_down) - pinch the free corner
+#   - move_to_keypoint               - move pinch over hinge axis (production)
+#   - release                        - open jaws to close the fold
+#
+# There's no dedicated "fold" skill in the production library - the
+# real-robot equivalent is grasp -> move -> release. We pick the
+# napkin_fixed body as the destination keypoint (the corner gets dropped
+# at the hinge to close the fold).
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "pinch corner"
+        strategy: top_down
+        force: 60
+        target_width: 0.020
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "napkin fixed"
+        offset_x: 0.0
+        offset_y: 0.0
+        offset_z: 0.08
+    - type: release
+      params: {}

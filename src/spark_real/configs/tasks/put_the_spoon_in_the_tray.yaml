@@ -1,0 +1,25 @@
+# "put the spoon in the tray" -- 41 human episodes.
+#
+# Same staging as the knife task, same tray. "spoon handle" rather than
+# "spoon" for the same reason: the bowl of the spoon is the high-contrast
+# region SAM3 prefers, and it is not the graspable part.
+task: "put the spoon in the tray"
+aliases:
+  - "place the spoon in the tray"
+  - "pick up the spoon and place it in the tray"
+  - "put spoon in tray"
+
+groups:
+  - text: "spoon handle"
+    expect: {min: 1, max: 1}
+    min_conf: 0.10
+    alt_prompts: ["spoon", "white spoon handle"]
+
+  - text: "tray"
+    expect: {min: 1, max: 1}
+    min_conf: 0.10
+    alt_prompts: ["cutlery tray", "silverware tray", "utensil tray"]
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

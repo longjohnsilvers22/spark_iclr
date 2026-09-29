@@ -1,0 +1,206 @@
+<mujoco model="corl_shirt_fold">
+  <!--
+    T-shirt fold scene: MuJoCo flexcomp T-shape.
+
+    The shirt is composed of 3 flexcomp grids forming a T/cross shape:
+      - BODY: 12x16 grid (144mm W x 192mm H), the main torso
+      - LEFT SLEEVE: 6x6 grid (72mm x 72mm), attached to upper-left of body
+      - RIGHT SLEEVE: 6x6 grid (72mm x 72mm), attached to upper-right of body
+
+    Layout (top view, X=forward from robot, Y=left-right):
+
+                collar (pinned)
+         +------+--------+------+
+         |sleeve|  body  |sleeve|
+         | left |  top   |right |
+         +------+        +------+
+                |  body  |
+                |  mid   |
+                |        |
+                | body   |
+                | bottom |
+                +--------+
+                   hem
+
+    Fold sequence:
+      1. Fold left sleeve in (pinch left sleeve tip, arc to body center)
+      2. Fold right sleeve in (same, mirror)
+      3. Fold hem up (pinch bottom edge center, arc to collar)
+
+    Graspable pinch tabs at:
+      - Left sleeve tip (left_sleeve_tab)
+      - Right sleeve tip (right_sleeve_tab)
+      - Hem center (hem_tab)
+
+    Coordinate system:
+      - Shirt center at (0.50, 0.0, 0.015) -- on table
+      - Body spans Y: -0.072 to +0.072 (144mm)
+      - Body spans X: 0.404 to 0.596 (192mm)
+      - Collar at X=0.404 (near robot), hem at X=0.596 (far)
+      - Left sleeve extends Y: +0.072 to +0.144
+      - Right sleeve extends Y: -0.072 to -0.144
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <option gravity="0 0 -9.81" timestep="0.002" integrator="implicitfast"/>
+  <size nconmax="12000" njmax="24000"/>
+
+  <include file="_panda_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.5 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="tab_mat" rgba="0.3 0.9 0.3 1" specular="0.1" shininess="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <body name="table" pos="0.55 0 -0.01">
+      <geom name="table_top" type="box" size="0.45 0.4 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1.5 0.5 0.0001"/>
+    </body>
+
+    <!--
+      BODY: main torso panel. 12x16 grid, spacing 0.012m.
+      12 cols (Y) x 16 rows (X) = 144mm x 192mm.
+      Center at (0.50, 0.0, 0.015).
+      Pin the top 2 rows (collar) to keep the shirt anchored during folds.
+      Vertices: 12*16 = 192 total. Rows 0-1 = vertices 0-23 (pinned collar).
+    -->
+    <flexcomp name="body" type="grid" count="12 16 1" spacing="0.012 0.012 0.012"
+              pos="0.50 0 0.015" mass="0.025"
+              rgba="0.2 0.4 0.8 0.85"
+              radius="0.005">
+      <edge damping="0.04"/>
+      <pin id="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23"/>
+    </flexcomp>
+
+    <!--
+      LEFT SLEEVE: 6x6 grid, spacing 0.012m = 72mm x 72mm.
+      Attaches to upper-left of body. The sleeve extends in +Y from body edge.
+      Body upper-left corner: Y = +0.066 (body center 0 + 6*0.012 - 0.012).
+      Sleeve starts at body edge Y=+0.066 and extends to Y=+0.138.
+      Sleeve X range: same as body top section, X from 0.404 to 0.476 (rows 0-5).
+      Center: X=0.440, Y=+0.102
+    -->
+    <flexcomp name="left_sleeve" type="grid" count="6 6 1" spacing="0.012 0.012 0.012"
+              pos="0.440 0.102 0.015" mass="0.008"
+              rgba="0.2 0.4 0.8 0.85"
+              radius="0.005">
+      <edge damping="0.04"/>
+      <!-- Pin the edge that connects to body (col 0, Y-side nearest body) -->
+      <pin id="0 6 12 18 24 30"/>
+    </flexcomp>
+
+    <!--
+      RIGHT SLEEVE: mirror of left sleeve in -Y direction.
+      Center: X=0.440, Y=-0.102
+    -->
+    <flexcomp name="right_sleeve" type="grid" count="6 6 1" spacing="0.012 0.012 0.012"
+              pos="0.440 -0.102 0.015" mass="0.008"
+              rgba="0.2 0.4 0.8 0.85"
+              radius="0.005">
+      <edge damping="0.04"/>
+      <!-- Pin the edge nearest body (col 5, highest Y indices in the grid) -->
+      <pin id="5 11 17 23 29 35"/>
+    </flexcomp>
+
+    <!--
+      Graspable tabs for the robot to pinch.
+    -->
+
+    <!-- Left sleeve tip: at the far +Y edge of left sleeve -->
+    <body name="left_sleeve_tab" pos="0.440 0.168 0.005">
+      <freejoint/>
+      <inertial pos="0 0 0.015" mass="0.008" diaginertia="1e-6 1e-6 1e-6"/>
+      <geom name="left_tab_geom" type="box" size="0.020 0.012 0.015"
+            material="tab_mat" mass="0.008"
+            condim="6" friction="5 3 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <site name="left_tab_site" pos="0 0 0.015" size="0.004" rgba="1 0 0 0.5"/>
+    </body>
+
+    <!-- Right sleeve tip: at the far -Y edge of right sleeve -->
+    <body name="right_sleeve_tab" pos="0.440 -0.168 0.005">
+      <freejoint/>
+      <inertial pos="0 0 0.015" mass="0.008" diaginertia="1e-6 1e-6 1e-6"/>
+      <geom name="right_tab_geom" type="box" size="0.020 0.012 0.015"
+            material="tab_mat" mass="0.008"
+            condim="6" friction="5 3 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <site name="right_tab_site" pos="0 0 0.015" size="0.004" rgba="1 0 0 0.5"/>
+    </body>
+
+    <!-- Hem tab: at the bottom (far X) edge of body, center Y -->
+    <body name="hem_tab" pos="0.596 0 0.005">
+      <freejoint/>
+      <inertial pos="0 0 0.015" mass="0.008" diaginertia="1e-6 1e-6 1e-6"/>
+      <geom name="hem_tab_geom" type="box" size="0.012 0.020 0.015"
+            material="tab_mat" mass="0.008"
+            condim="6" friction="5 3 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <site name="hem_tab_site" pos="0 0 0.015" size="0.004" rgba="1 0 0 0.5"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="cam_target" pos="0.5 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.5 0.0 0.9">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.55 -1.1 0.5">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.5 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <equality>
+    <!-- Connect left sleeve tab to left_sleeve_35 (far corner of sleeve grid: row5 col5) -->
+    <connect name="left_tab_connect" body1="left_sleeve_35" body2="left_sleeve_tab"
+             anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.01"/>
+    <!-- Connect right sleeve tab to right_sleeve_0 (far corner: row0 col0) -->
+    <connect name="right_tab_connect" body1="right_sleeve_0" body2="right_sleeve_tab"
+             anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.01"/>
+    <!-- Connect hem tab to body vertex at bottom-center: row 15 col 6 = vertex 186 -->
+    <connect name="hem_tab_connect" body1="body_186" body2="hem_tab"
+             anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.01"/>
+
+    <!-- Grasp welds (activated during pinch, deactivated on release) -->
+    <weld name="left_grasp_weld" body1="hand" body2="left_sleeve_tab"
+          relpose="0 0 0.1034 1 0 0 0"
+          solref="0.01 1" solimp="0.95 0.99 0.001" active="false"/>
+    <weld name="right_grasp_weld" body1="hand" body2="right_sleeve_tab"
+          relpose="0 0 0.1034 1 0 0 0"
+          solref="0.01 1" solimp="0.95 0.99 0.001" active="false"/>
+    <weld name="hem_grasp_weld" body1="hand" body2="hem_tab"
+          relpose="0 0 0.1034 1 0 0 0"
+          solref="0.01 1" solimp="0.95 0.99 0.001" active="false"/>
+  </equality>
+</mujoco>

@@ -1,0 +1,238 @@
+# Bimanual Franka rig (Panda left + FR3 right + dual Dynamixel jaws).
+# See docs/bimanual.md for hardware notes and docs/bimanual_design.md
+# for the architectural rationale behind the schema below.
+
+robot:
+  family: "bimanual_franka"
+  # Per-arm IPs are required; the legacy `ip` slot is intentionally
+  # absent so a config copy-paste from the single-arm Franka YAML
+  # surfaces as a clear error rather than silently configuring one arm.
+  left_ip:  "172.16.0.101"   # Franka Emika Panda
+  right_ip: "172.16.0.102"   # Franka Research 3
+  frequency: 1000
+
+  # Mirror-symmetric home configs (radians, 7-vector each). The left arm
+  # is mounted facing the operator; the right arm is mirrored across the
+  # robot-base-y axis so the two elbows fold outward on a coordinated
+  # home and never approach the midline.
+  home_config_left:  [-0.010472, -0.537561, 0.0, -2.197370,
+                       0.019199,  1.673771, -0.797615]
+  home_config_right: [ 0.010472, -0.537561, 0.0, -2.197370,
+                      -0.019199,  1.673771,  0.797615]
+
+  # Per-arm base offsets relative to the world origin (rig table center,
+  # +x forward, +y left, +z up). The Panda sits 32 cm to the operator's
+  # left of the midline; the FR3 sits 32 cm to the right; both share Z=0.
+  # Update after measuring the actual mounting bolts.
+  base_left:  {xyz: [0.00,  0.32, 0.00], rpy: [0, 0,  0.0]}
+  base_right: {xyz: [0.00, -0.32, 0.00], rpy: [0, 0,  0.0]}
+
+  # Motion caps applied per-arm.
+  max_joint_velocity: 1.05
+  max_linear_velocity: 0.15      # tighter than single Franka - bimanual cell is crowded
+
+grippers:
+  type: "dynamixel"
+  # Shared USB-CAN bus; per-servo IDs match the lab rig (left=1, right=2).
+  port: "/dev/ttyUSB0"
+  baudrate: 1000000
+  left_id: 1
+  right_id: 2
+  # Force defaults (N). Tune per-task via skill params.
+  speed: 0.10
+  force: 15.0
+
+# Per-arm workspace cuboids in world frame. The two boxes overlap only in
+# the central handoff column (|y| < 0.18 and z > 0.20) so the inter-arm
+# distance CBF is the primary collision constraint in that region.
+workspace_left:
+  x_min: -0.20
+  x_max:  0.85
+  y_min: -0.05
+  y_max:  0.85
+  z_min:  0.00
+  z_max:  1.10
+  reach_max: 1.15
+  eta_kinematic: 5.0
+
+workspace_right:
+  x_min: -0.20
+  x_max:  0.85
+  y_min: -0.85
+  y_max:  0.05
+  z_min:  0.00
+  z_max:  1.10
+  reach_max: 1.15
+  eta_kinematic: 5.0
+
+# Table surface in the rig world frame (base_left/base_right share z=0 with
+# the table center). ScoreExecutor TABLE_Z_FLOOR for both arms; without it
+# the per-arm executors keep the UR10e class default of -0.276.
+table_z_floor: 0.0
+
+# ScoreExecutor per-arm constants (control/executor_core.py
+# _apply_family_workspace_bounds). Franka tool-Z-down grasp rotvec; the code
+# fallback is the same [pi, 0, 0] the single-arm Franka runs.
+control:
+  grasp_orientation: [3.14159, 0.0, 0.0]
+
+# Inter-arm distance constraint (CBF). TCP-to-TCP distance never below
+# `dist_hard_m`; the barrier ramps in linearly between `dist_soft_m` and
+# `dist_hard_m` so coordinated handoffs still slow down gracefully.
+inter_arm:
+  dist_hard_m: 0.12
+  dist_soft_m: 0.20
+  eta_kinematic: 8.0
+
+# Per-primitive wall-clock budgets (seconds), from the paper appendix.
+# Loaded once at executor init (control/primitive_timeouts.py) and enforced
+# at the dispatch choke point: a budget overrun aborts the motion via the
+# executor's existing abort path and routes the failed result into the
+# EXISTING recovery layer, not a trial termination. `default` covers
+# unlisted primitives; `constrained_scrub` carries the paper's `wipe`
+# budget (`wipe` is its planner-grammar alias).
+timeouts:
+  move_to_keypoint: 30.0   # untuned, copied from ur10e
+  move_relative: 2.0
+  grasp: 25.0              # untuned, copied from ur10e
+  release: 20.0            # untuned, copied from ur10e
+  insert: 6.0
+  push_object: 4.0
+  open_drawer: 5.0
+  wipe: 10.0
+  constrained_scrub: 10.0
+  default: 8.0
+  # Generous budgets for the long composite primitives in this deployment's
+  # grammar (not in the paper's simple table). The 8.0s default would kill
+  # these legitimately-long skills mid-run; these entries keep the watchdog as
+  # a true-hang catch rather than a premature abort. Includes the coordinated
+  # bimanual primitives.
+  grasp_se3: 90.0
+  cloth_fold: 180.0
+  cloth_fold_single: 90.0
+  hem_press: 60.0
+  pants_fold: 180.0
+  sweep: 120.0
+  pour: 60.0
+  place_in_slot: 60.0
+  search_keypoint: 60.0
+  retract_retry: 60.0
+  sponge_wash: 150.0
+  rinse: 90.0
+  pour_to_level: 60.0
+  sweep_to_container: 120.0
+  constrained_scrub_oscillating: 60.0
+  compliant_insert: 60.0
+  pen_write: 120.0
+  throw_to: 30.0
+  bimanual_shirt_fold: 240.0
+  bimanual_lift_together: 90.0
+  bimanual_arc_drape: 120.0
+  bimanual_pants_fold: 240.0
+
+# T-shirt fold tuning (meters). Read by the cloth_fold primitive via
+# RobotProfile.cloth(); a per-call BT param overrides any value here, and
+# any key left unset falls back to the hardcoded primitive default.
+# PLACEHOLDER values copied from the single-arm Franka config: the bimanual
+# rig has not been tuned for folding yet. Measure and update once the
+# coordinated fold routine runs on hardware.
+cloth:
+  sleeve_lift_h: 0.120        # placeholder, tune on the bimanual rig
+  body_lift_h: 0.080          # placeholder, tune on the bimanual rig
+  arc_peak: 0.030             # placeholder, tune on the bimanual rig
+  sleeve_past_center_m: 0.08  # placeholder, tune on the bimanual rig
+  grasp_z: -0.02              # placeholder, tune on the bimanual rig
+
+# Cameras. Two wrist-mounted RealSenses + one static ZED Mini on the
+# center tripod. Roles are part of the contract - `wrist_left` is the
+# left arm's egocentric view, `wrist_right` the right arm's, and
+# `external` is the third-person global view used as the primary
+# localization camera in `merge_detections`.
+cameras:
+  - role: "external"
+    type: "zed_mini"
+    serial: ""              # leave empty to pick the first ZED on the bus
+    width: 1280
+    height: 720
+    fps: 30
+    depth_mode: "NEURAL"    # ZED-SDK preset; falls back to STANDARD if unavailable
+  - role: "wrist_left"
+    type: "realsense"
+    serial: ""              # set after enumerating: `rs-enumerate-devices`
+    width: 640
+    height: 480
+    fps: 30
+    arm: "left"
+    # 4x4 TCP->camera transform; placeholder identity until bracket is
+    # measured. The bimanual calibrator updates this file in place when
+    # the cross-arm tip-touch routine produces a fix.
+    tool_offset_xyz: [0.00, 0.06, -0.05]
+  - role: "wrist_right"
+    type: "realsense"
+    serial: ""
+    width: 640
+    height: 480
+    fps: 30
+    arm: "right"
+    tool_offset_xyz: [0.00, 0.06, -0.05]
+
+# ZMQ state broadcast for external subscribers (perception, VLA, dashboards).
+state_broadcast:
+  enabled: true
+  port: 5601
+  rate_hz: 30
+
+# Collision-behaviour thresholds applied to BOTH arms (per-arm overrides
+# can be added later if asymmetric tuning is needed).
+collision_behavior:
+  joint_torque_nom_lower: [10.0, 10.0,  9.0,  9.0,  8.0,  7.0,  6.0]
+  joint_torque_nom_upper: [10.0, 10.0,  9.0,  9.0,  8.0,  7.0,  6.0]
+  cartesian_force_nom_lower: [10.0, 10.0, 10.0, 12.5, 12.5, 12.5]
+  cartesian_force_nom_upper: [10.0, 10.0, 10.0, 12.5, 12.5, 12.5]
+
+vla:
+  policy_type: "pi05"
+  control_frequency: 10
+  action_horizon: 16
+
+# Behavior-tree cache (spark_real/bt_library.py). Seeds are UR10e-captured
+# trees with Robotiq gripper numbers, so they are not installed here.
+bt:
+  seed_on_start: false
+
+# The blocks below spell out today's code defaults so this rig's effective
+# settings are visible in one place. Consumers: control/success_verifier.py
+# (VerifyConfig), control/executor_verify.py, control/execution_recovery.py,
+# control/primitive_trace.py, control/executor_motion.py, pipeline_perception.py.
+verification:
+  enabled: true
+  min_conf: 0.35
+  require_two_views: false
+  inside_xy_margin_m: -0.02
+  inside_z_tol_m: 0.06
+  fallback_2d_containment: 1.01   # > 1.0 = the 2D fallback abstains
+  on_missing: unverified
+  retry_on_fail: false
+  # retry_max_attempts is left to the code default (2, or 1 under
+  # --strict-verify), which a constant here could not reproduce.
+  release_verdict: false
+  attribution: false
+
+perception:
+  rebind:
+    enabled: true
+    log_drift_cm: 2.0
+  sticky:
+    enabled: false
+    gate_m: 0.12
+    ambiguity_sep_m: 0.03
+    dedup_radius_m: 0.02
+  fusion:
+    enabled: false
+
+place:
+  release_giveback: false
+
+trace:
+  enabled: true
+  save_images: false

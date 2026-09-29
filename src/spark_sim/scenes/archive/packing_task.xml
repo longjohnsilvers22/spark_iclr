@@ -1,0 +1,120 @@
+<mujoco model="packing_task">
+  <!-- SPARK robosuite-style scene: Packing items into box -->
+  <include file="ur_gripper.xml"/>
+
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8" rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="floor_tex" builtin="checker" rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512" mark="cross" markrgb="0.5 0.5 0.55"/>
+    <material name="floor_mat" texture="floor_tex" texrepeat="15 15" reflectance="0.2"/>
+    <material name="table_ceramic" rgba="0.9 0.9 0.92 1"/>
+    <material name="table_legs_metal" rgba="0.4 0.4 0.45 1" reflectance="0.8"/>
+    <material name="walls_mat" rgba="0.85 0.85 0.88 1"/>
+    <material name="cardboard" rgba="0.75 0.6 0.45 1" reflectance="0.05"/>
+    <material name="item_blue" rgba="0.2 0.4 0.9 1" reflectance="0.3"/>
+    <material name="item_green" rgba="0.2 0.8 0.3 1" reflectance="0.3"/>
+    <material name="item_yellow" rgba="0.95 0.85 0.2 1" reflectance="0.3"/>
+    <material name="item_red" rgba="0.9 0.2 0.2 1" reflectance="0.3"/>
+    <material name="pedestal_mat" rgba="0.3 0.4 0.7 1" reflectance="0.5"/>
+  </asset>
+
+  <worldbody>
+    <!-- Soft distributed lighting -->
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="-2 2 3" dir="0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+
+    <geom condim="3" group="1" material="floor_mat" name="floor" pos="0 0 0" size="3 3 .125" type="plane"/>
+
+    <!-- Walls -->
+    <geom pos="-1.25 2.25 1.5" quat="0.6532815 0.6532815 0.2705981 0.2705981" size="1.06 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+    <geom pos="-1.25 -2.25 1.5" quat="0.6532815 0.6532815 -0.2705981 -0.2705981" size="1.06 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+    <geom pos="1.25 3 1.5" quat="0.7071 0.7071 0 0" size="1.75 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+    <geom pos="1.25 -3 1.5" quat="0.7071 -0.7071 0 0" size="1.75 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+    <geom pos="-2 0 1.5" quat="0.5 0.5 0.5 0.5" size="1.5 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+    <geom pos="3 0 1.5" quat="0.5 0.5 -0.5 -0.5" size="3 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" material="walls_mat"/>
+
+    <body name="robot_pedestal" pos="-0.6 0 0.1">
+      <geom type="box" size="0.3 0.2 0.1" material="pedestal_mat"/>
+    </body>
+
+    <!-- Table -->
+    <body name="table" pos="0.6 0 0.4">
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" group="0" friction="1 0.005 0.0001"/>
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" conaffinity="0" contype="0" group="1" material="table_ceramic"/>
+      <geom pos="0.45 0.35 -0.2" size="0.03 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="0.45 -0.35 -0.2" size="0.03 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 0.35 -0.2" size="0.03 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 -0.35 -0.2" size="0.03 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+    </body>
+
+    <!-- Packing box -->
+    <body name="box" pos="0.35 0 0.42">
+      <geom pos="0 0 0" size="0.12 0.1 0.01" type="box" material="cardboard"/>
+      <geom pos="0.12 0 0.06" size="0.01 0.1 0.06" type="box" material="cardboard"/>
+      <geom pos="-0.12 0 0.06" size="0.01 0.1 0.06" type="box" material="cardboard"/>
+      <geom pos="0 0.1 0.06" size="0.12 0.01 0.06" type="box" material="cardboard"/>
+      <geom pos="0 -0.1 0.06" size="0.12 0.01 0.06" type="box" material="cardboard"/>
+    </body>
+
+    <!-- Items to pack -->
+    <body name="item1" pos="0.65 -0.25 0.445">
+      <freejoint name="item1_free"/>
+      <geom type="box" size="0.03 0.03 0.03" material="item_blue" condim="6" friction="1 0.5 0.0001"/>
+      <inertial pos="0 0 0" mass="0.06" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="item2" pos="0.75 -0.15 0.445">
+      <freejoint name="item2_free"/>
+      <geom type="box" size="0.025 0.025 0.025" material="item_green" condim="6" friction="1 0.5 0.0001"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="item3" pos="0.85 -0.05 0.445">
+      <freejoint name="item3_free"/>
+      <geom type="box" size="0.025 0.025 0.025" material="item_yellow" condim="6" friction="1 0.5 0.0001"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="item4" pos="0.9 0.1 0.445">
+      <freejoint name="item4_free"/>
+      <geom type="box" size="0.02 0.02 0.02" material="item_red" condim="6" friction="1 0.5 0.0001"/>
+      <inertial pos="0 0 0" mass="0.04" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="camera1" pos="0.6 0.0 1.8">
+      <camera name="camera1" fovy="50" pos="0 0 0" xyaxes="1 0 0 0 0 1"/>
+    </body>
+    <body name="camera2" pos="0.550 -1.473 1.462">
+      <camera name="camera2" fovy="60" pos="0 0 0" xyaxes="1.000 0.013 0.000 -0.008 0.612 0.791"/>
+    </body>
+    <body name="camera3" pos="0.615 1.473 1.024">
+      <camera name="camera3" fovy="60" pos="0 0 0" xyaxes="-1.000 0.017 0.000 -0.008 -0.438 0.899"/>
+    </body>
+
+    <body name="keypoint_markers" pos="0 0 0">
+      <site name="keypoint_0" pos="0 0 -10" size="0.01" rgba="1 0 0 0" type="sphere"/>
+      <site name="keypoint_1" pos="0 0 -10" size="0.01" rgba="1 0.2 0 0" type="sphere"/>
+      <site name="keypoint_2" pos="0 0 -10" size="0.01" rgba="1 0.4 0 0" type="sphere"/>
+      <site name="keypoint_3" pos="0 0 -10" size="0.01" rgba="1 0.6 0 0" type="sphere"/>
+      <site name="keypoint_4" pos="0 0 -10" size="0.01" rgba="1 0.8 0 0" type="sphere"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home" qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0  0 0 0 0 0 0 0 0  0.65 -0.25 0.445 1 0 0 0  0.75 -0.15 0.445 1 0 0 0  0.85 -0.05 0.445 1 0 0 0  0.9 0.1 0.445 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0  0"/>
+  </keyframe>
+</mujoco>

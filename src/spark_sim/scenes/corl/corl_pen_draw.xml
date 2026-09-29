@@ -1,0 +1,158 @@
+<mujoco model="corl_pen_draw">
+  <!--
+    CoRL pen draw task: tool-use with grip offset calculation.
+      - Panda arm at world origin (table in front).
+      - Pen: blue cylinder r=4mm, length=150mm (half-height=75mm), lying FLAT on table.
+        MuJoCo cylinder axis is along Z; rotate 90 deg about X to lay flat along Y.
+      - Notebook: flat cream box 200x150x3mm on the table, next to pen.
+      - Cameras: agentview, sideview, topview.
+
+    Task sequence:
+      1. Top-down grasp pen across body (OBB yaw aligned perpendicular to long axis).
+      2. Lift pen.
+      3. Roll wrist 90 degrees so pen tip points DOWN.
+      4. Compute tip offset: pen sticks out ~75mm below grip centre.
+      5. Lower pen tip to notebook surface.
+      6. Draw circle: 4 cycles, R=30mm, 16 waypoints per cycle.
+      7. Lift, release.
+
+    Grip offset math:
+      Pen half-height = 0.075m. Gripped at centre -> tip extends 0.075m below TCP
+      after the 90-degree roll. When drawing, TCP_z = notebook_surface_z + 0.075.
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <option integrator="implicitfast"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.4 0 0.3" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="pen_mat" rgba="0.15 0.25 0.75 1"
+              specular="0.7" shininess="0.8" reflectance="0.3"/>
+    <material name="pen_tip_mat" rgba="0.10 0.10 0.10 1"
+              specular="0.3" shininess="0.2"/>
+    <material name="notebook_mat" rgba="0.95 0.93 0.88 1"
+              specular="0.1" shininess="0.05" reflectance="0.05"/>
+    <material name="notebook_line_mat" rgba="0.6 0.75 0.9 1"/>
+    <!-- Ink trace material for the pen tip -->
+    <material name="ink_mat" rgba="0.1 0.1 0.5 0.8"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table -->
+    <body name="table" pos="0.55 0 -0.01">
+      <geom name="table_top" type="box" size="0.45 0.4 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Pen: cylinder r=4mm, full length=150mm (half-height=75mm).
+      Lying flat on table along world Y axis.
+      MuJoCo cylinder default axis = Z. Rotate pi/2 about X to lay along Y.
+      Centre at table surface: z = radius = 0.004.
+      Position: (0.50, 0.18, 0.004) -- right side of table.
+    -->
+    <body name="pen" pos="0.50 0.18 0.004" euler="1.5708 0 0">
+      <freejoint name="pen_free"/>
+      <!-- Main pen body -->
+      <geom name="pen_body" type="cylinder" size="0.005 0.070"
+            material="pen_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Pen tip marker (small cone-like cylinder at one end) -->
+      <geom name="pen_tip" type="cylinder" size="0.002 0.003"
+            pos="0 0 -0.075" material="pen_tip_mat"
+            condim="6" friction="2 1 0.002"/>
+      <inertial pos="0 0 0" mass="0.015"
+                diaginertia="0.00002 0.00002 0.000001"/>
+      <!-- Site at pen tip for tracking -->
+      <site name="pen_tip_site" pos="0 0 -0.078" size="0.002"
+            rgba="1 0 0 0.5" type="sphere"/>
+    </body>
+
+    <!--
+      Notebook: flat box 200x150x3mm.
+      Position: (0.50, -0.12, 0.0015) -- on the -Y side of the table,
+      next to the pen. Bottom on table, top at z = 0.003.
+    -->
+    <body name="notebook" pos="0.50 -0.12 0.0">
+      <geom name="notebook_base" type="box" size="0.100 0.075 0.0015"
+            pos="0 0 0.0015" material="notebook_mat"
+            friction="1 0.5 0.001"/>
+      <!-- Horizontal ruled lines (visual only, 5 lines) -->
+      <geom name="nb_line1" type="box" size="0.095 0.0003 0.00001"
+            pos="0 -0.050 0.0031" material="notebook_line_mat"
+            contype="0" conaffinity="0"/>
+      <geom name="nb_line2" type="box" size="0.095 0.0003 0.00001"
+            pos="0 -0.025 0.0031" material="notebook_line_mat"
+            contype="0" conaffinity="0"/>
+      <geom name="nb_line3" type="box" size="0.095 0.0003 0.00001"
+            pos="0  0.000 0.0031" material="notebook_line_mat"
+            contype="0" conaffinity="0"/>
+      <geom name="nb_line4" type="box" size="0.095 0.0003 0.00001"
+            pos="0  0.025 0.0031" material="notebook_line_mat"
+            contype="0" conaffinity="0"/>
+      <geom name="nb_line5" type="box" size="0.095 0.0003 0.00001"
+            pos="0  0.050 0.0031" material="notebook_line_mat"
+            contype="0" conaffinity="0"/>
+      <!-- Centre site for drawing target -->
+      <site name="notebook_centre" pos="0 0 0.003" size="0.003"
+            rgba="0 0.8 0 0.3" type="sphere"/>
+    </body>
+
+    <!-- Camera bodies -->
+    <body name="cam_target" pos="0.5 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.5 0.0 0.9">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.55 -1.1 0.5">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.5 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <!--
+      qpos: 7 arm joints + 2 finger joints + pen freejoint (7: pos3 + quat4)
+      Pen lying flat at (0.50, 0.18, 0.004), rotated 90 deg about X:
+        quat wxyz for euler(pi/2, 0, 0) = (cos(pi/4), sin(pi/4), 0, 0)
+                                        = (0.7071068, 0.7071068, 0, 0)
+    -->
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785  0.04 0.04
+               0.50 0.18 0.004 0.7071068 0.7071068 0 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785  255"/>
+  </keyframe>
+</mujoco>

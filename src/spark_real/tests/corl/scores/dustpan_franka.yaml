@@ -1,0 +1,30 @@
+# CoRL dustpan sweep task.
+# Pre-baked BT score dispatched through the production skill registry.
+# Exercises:
+#   - grasp_se3 (strategy=top_down) -- grab the brush by its handle
+#   - move_relative dz=+0.15       -- lift brush clear of table
+#   - sweep                        -- multi-pass push of debris into dustpan
+#     (uses the production sweep primitive from primitives.py which
+#      computes stripe geometry from the area/target OBB; falls back
+#      to move_relative strokes in sim where SAM3 is unavailable)
+#   - release                      -- drop brush on table
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: brush
+        strategy: top_down
+        force: 60
+        target_width: 0.025
+    - type: move_relative
+      params:
+        dz: 0.15
+    - type: sweep
+      params:
+        area_label: debris
+        target_label: dustpan
+        n_passes: 3
+        sweep_height_m: 0.005
+    - type: release
+      params: {}

@@ -1,0 +1,82 @@
+# CoRL F3: soap bottle + sponge wash task (auto-repeat).
+# Full sequence per trial:
+#   1. Pick soap bottle by cap/neck (angled 60-deg grasp) -> tilt over bowl
+#      to dispense -> place bottle back near origin
+#   2. Pick sponge -> scrub bowl -> place sponge back near origin
+#
+# The soap bottle grasp uses strategy: "horizontal" with pitch_rad: 1.05
+# (60 degrees from horizontal = 30 degrees from vertical) and
+# grasp_height_fraction: 0.8 to target the narrow cap/neck area
+# (top 20% of the bottle), NOT the wide body.
+#
+# Mode: auto (no human intervention between trials)
+# Prompts: ["soap bottle", "sponge", "bowl"]
+
+task: wash the bowl with soap and sponge
+tree:
+  type: sequence
+  children:
+    # --- Phase 1: Soap bottle ---
+    # Grasp the soap bottle at the cap/neck area using a 60-degree
+    # angled approach. The narrow neck (~28mm) is easier to grip than
+    # the wide body (~50mm), and the cap acts as a positive stop.
+    - type: grasp_se3
+      params:
+        keypoint_label: "soap bottle"
+        strategy: horizontal
+        pitch_rad: 1.05
+        object_height_m: 0.20
+        target_width: 0.028
+        force: 60
+        grasp_height_fraction: 0.8
+        approach_dir_x: -1.0
+        approach_dir_y: 0.0
+        pre_grasp_distance: 0.12
+
+    # Pour / tilt soap over the bowl
+    - type: pour
+      params:
+        source_label: "soap bottle"
+        target_label: "bowl"
+        pour_angle_rad: 1.0
+        target_fill_fraction: 0.5
+        max_pour_s: 3.0
+
+    # Move back to soap bottle's original position and place it down
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "soap bottle"
+        offset_z: 0.10
+    - type: move_relative
+      params:
+        dz: -0.08
+    - type: release
+      params: {}
+    - type: move_relative
+      params:
+        dz: 0.10
+
+    # --- Phase 2: Sponge ---
+    - type: grasp_se3
+      params:
+        keypoint_label: sponge
+        strategy: top_down
+        force: 60
+        target_width: 0.040
+        grip_mode: position
+    - type: constrained_scrub
+      params:
+        target_label: bowl
+        force_n: 6.0
+        n_cycles: 3
+        scrub_radius_m: 0.04
+        pattern: circle
+    - type: move_to_keypoint
+      params:
+        keypoint_label: sponge
+        offset_z: 0.08
+    - type: move_relative
+      params:
+        dz: -0.06
+    - type: release
+      params: {}

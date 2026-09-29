@@ -1,0 +1,26 @@
+# CoRL F3: sponge wash plate.
+# Pre-baked BT score dispatched through the production skill registry.
+# Exercises:
+#   - grasp_se3 (strategy=top_down)  - grab the sponge
+#   - constrained_scrub               - production force-tracked scrub
+#                                       (falls back to open-loop on sim,
+#                                       since sim has no F/T sensor)
+#   - release                          - production release
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: sponge
+        strategy: top_down
+        force: 60
+        target_width: 0.040
+    - type: constrained_scrub
+      params:
+        target_label: plate
+        force_n: 6.0
+        n_cycles: 2
+        scrub_radius_m: 0.04
+        pattern: circle
+    - type: release
+      params: {}

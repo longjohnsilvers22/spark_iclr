@@ -1,0 +1,41 @@
+# Task 1 of the human-parity demo set: "put the knife in the tray".
+#
+# Grasp label is "knife handle", NOT "knife": the bare noun grounds on the
+# blade. Same convention for spoon/fork.
+instruction: "put the knife in the tray"
+aliases:
+  - "pick up the knife and place it in the tray"
+  - "pick up knife and place it in the tray"
+  - "place the knife in the tray"
+  - "put knife in tray"
+objects: ["knife handle", "tray"]
+priority: 10
+promote: true
+verified: true
+provenance: >-
+  Merged from two live-run library entries: 69c7e9bd9532
+  ("put the utensils in the tray", success=1) supplied the knife-handle
+  grasp (force 50, target_width 0.01) and 0b20251e4902
+  ("pick up knife and place it in the tray", success=1) supplied the
+  tray drop-off via move_to_keypoint + release.
+notes: >-
+  Drop-off is a plain move_to_keypoint on the tray centroid rather than
+  place_in_slot, because the human episodes for this task use a single
+  undivided tray. Switch the last two nodes to
+  place_in_slot{container_label: tray, slot_idx: 0} if the rig is staged
+  with the slotted cutlery tray.
+score:
+  task: "put the knife in the tray"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "knife handle", offset_z: 0.0}
+      - type: grasp
+        params: {force: 50, target_width: 0.01}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: move_to_keypoint
+        params: {keypoint_label: "tray", offset_z: 0.05}
+      - type: release
+        params: {tilt_angle: 0.0}

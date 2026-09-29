@@ -1,0 +1,42 @@
+# Task 4 of the human-parity demo set: "stack the blue block on the gray block".
+#
+# This task and stack_gray_on_blue.yaml tokenise IDENTICALLY as a set
+# ("stack", "blue", "block", "gray"), so fuzzy retrieval alone cannot tell
+# them apart. They are separated by the exact and near-exact tiers, which
+# preserve token ORDER. Keep both instruction strings verbatim.
+instruction: "stack the blue block on the gray block"
+aliases:
+  - "stack the blue block on the grey block"
+  - "put the blue block on the gray block"
+  - "stack blue block on gray block"
+objects: ["blue block", "gray block"]
+priority: 10
+promote: true
+verified: true
+provenance: >-
+  Captured verbatim from live-run library entry 730011ce2da1
+  ("stack the blue block on the grey block", success=1 fail=0), the only
+  green run of this exact task. Instruction respelled grey -> gray to
+  match the human corpus task string; the original spelling is kept as an
+  alias and the label resolver folds grey/gray at detection time anyway.
+notes: >-
+  Uses the force-guarded `stack` primitive rather than
+  move_to_keypoint + release, so the release height comes from contact
+  rather than a hardcoded offset. force_threshold 15 N.
+score:
+  task: "stack the blue block on the gray block"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "blue block", offset_z: 0.0}
+      - type: grasp
+        params: {force: 60, target_width: 0.03}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: stack
+        params:
+          target_label: "gray block"
+          force_threshold: 15.0
+          max_descent: 0.25
+          clearance: 0.05

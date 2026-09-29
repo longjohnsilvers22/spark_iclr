@@ -1,0 +1,37 @@
+# "stack the blue block on the gray block" -- 50 human episodes.
+#
+# Scene (verified against camera_1/frame_0000): exactly two cubes on the
+# bare table, one blue and one near-white. Note the "gray" block reads as
+# off-white in the birdview frames -- the alt_prompts exist because
+# "gray block" against a grey table is a genuinely marginal prompt.
+#
+# Perception for this task and its mirror is IDENTICAL. Only the behaviour
+# tree differs: the roles swap in the BT, never here. The two instructions
+# are bag-of-words identical, so the registry can only separate them on an
+# exact/alias hit -- which is why both files exist and why neither leans on
+# the fuzzy path.
+task: "stack the blue block on the gray block"
+aliases:
+  - "put the blue block on the gray block"
+  - "place the blue block on top of the gray block"
+  - "stack the blue block on the grey block"
+
+# Never flatten Z across instances here: once the first cube is placed the
+# scene is genuinely two-layered, and a median-Z rewrite would report both
+# cubes at the same height and drive the second pick into the table.
+per_instance_z: true
+
+groups:
+  - text: "blue block"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["blue cube"]
+
+  - text: "gray block"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["white block", "grey block", "light gray block", "gray cube"]
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

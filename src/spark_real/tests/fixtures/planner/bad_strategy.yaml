@@ -1,0 +1,10 @@
+```yaml
+task: put the knife in the tray
+tree:
+  type: sequence
+  children:
+    - type: grasp
+      params:
+        force: 50
+        grasp_strategy: "sideways"
+```

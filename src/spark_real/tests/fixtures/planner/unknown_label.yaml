@@ -1,0 +1,13 @@
+```yaml
+task: put the knife in the tray
+tree:
+  type: sequence
+  children:
+    - type: release
+      params: {}
+verify:
+  all:
+    - pred: inside
+      obj: "spatula 3"
+      container: "tray"
+```

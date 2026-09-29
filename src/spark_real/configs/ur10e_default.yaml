@@ -1,0 +1,633 @@
+# UR10e + Robotiq 2F-85 default configuration
+#
+# First-class in-repo embodiment: the server routes the ur10e family through
+# robots/factory.py -> control/ur10e_driver.py (UR10eDriver), wrapped in
+# SafeRobot + ScoreExecutor exactly like franka. A fresh UR10e host needs
+# only `pip install ur-rtde` and a hand-eye calibration; no external teleop
+# deploy checkout is required (that path survives as a deprecated fallback).
+# Launch: python -m spark_real.server --robot ur10e --port 8888
+
+robot:
+  ip: "192.168.56.101"   # UR10e controller IP (verify with ping)
+  frequency: 500         # RTDE communication rate (Hz)
+  # Captured TCP (-0.8144, 0.1089, 0.1304) rot (-2.2836, -2.1399, 0.0231).
+  # Must stay byte-identical to UR10eDriver.HOME_CONFIG, scripts/gamepad_teleop_ur10e.py
+  # HOME_JOINTS and control.home_tcp_rotvec above: this is the human-teleop
+  # collector's home, so SPARK demos start where the /data/teleop_episodes
+  # corpus starts. A value differing by 170 deg at wrist 3 rolls the wrist
+  # camera a half turn and flips every recorded wrist image.
+  home_config: [3.2070, -1.8788, -1.7903, 5.2496, 1.5762, 0.0916]
+
+  # Motion limits
+  max_joint_velocity: 1.05       # rad/s
+  max_linear_velocity: 0.25      # m/s
+
+gripper:
+  type: "robotiq_2f85"
+  speed: 255
+  force: 100              # full grip force (Robotiq norm 0-100)
+
+# Workspace safety bounds (meters, in robot base frame).
+# UR10e has ~1.3m reach. Base sits at table height (z=0.225 world),
+# so z=0 in base frame ~ table surface.
+workspace:
+  x_min: -0.9
+  x_max: 0.9
+  y_min: -0.9
+  y_max: 0.9
+  z_min: -0.020    # Slightly below table surface to allow grasping
+                    # thin objects lying flat. The hard descent stop
+                    # is enforced by table_z_floor + 2mm in grasping.py.
+  z_max: 1.2
+  eta_kinematic: 5.0
+
+# Calibrated tabletop floor (robot base frame). ScoreExecutor uses
+# (table_z_floor + 2mm) as the hard descent stop during grasp retries.
+# UR10e base is mounted at table height, so table surface is at ~z=0
+# in base frame. Adjust after hand-eye calibration.
+table_z_floor: -0.005
+
+# ScoreExecutor + UR10e SafeRobot bounds in the UR10e base frame. These are
+# the historical class-constant values from ScoreExecutorCore and the live
+# UR10e SafetyConfig copy in pipeline_init.py; they are DELIBERATELY distinct
+# from the `workspace:` block above (which feeds _family_safety_bounds, a path
+# the live UR10e branch never reaches). Keep them byte-identical to the code
+# fallbacks: changing either side changes UR10e motion behavior.
+control:
+  # UR10e top-down TCP rotvec, expressed in the half-turn that is NEAREST HOME
+  # (3.6 deg away). The previous value [2.103, -2.329, 0.059] is the same grasp
+  # -- a parallel jaw is symmetric under 180 deg about the tool axis -- but sat
+  # -177.8 deg in yaw from home_tcp_rotvec, so every task spun wrist 3 a half
+  # turn: it wrapped the wrist-camera USB cable and made the Cartesian servo
+  # crawl through the yaw. Keep this within ~90 deg of home_tcp_rotvec.
+  grasp_orientation: [2.3038, 2.0802, -0.0048]
+  # TCP rotation at UR10eDriver.HOME_CONFIG. The wrist-calibration sweep is
+  # built around THIS, not grasp_orientation: the two are ~172 deg apart at
+  # wrist 3, so anchoring the sweep on grasp_orientation would start it a half
+  # turn from home and wrap the wrist camera's USB cable. Yaw is additionally
+  # capped at +/-90 deg from here (see WRIST_POSE_PROFILES.max_yaw_deg).
+  home_tcp_rotvec: [-2.2836, -2.1399, 0.0231]
+  workspace_min: [-1.1, -0.5, -0.27]         # ScoreExecutor WORKSPACE_MIN
+  workspace_max: [-0.5, 0.7, 0.50]           # ScoreExecutor WORKSPACE_MAX
+  max_reach: 1.15                            # ScoreExecutor MAX_REACH
+  table_z_floor: -0.276                      # ScoreExecutor TABLE_Z_FLOOR FALLBACK. Calibration takes precedence: output/calibrations/table_plane.json (surface_z + table_safety_margin_m) overrides this if present. Measured table surface = -0.2779 (CLOSED fingertips), +2mm code margin. NOTE: this is the CLOSED-fingertip table. The open-jaw grasp descent (executor_grasp._grasp_v2) subtracts GRASP_DEPTH (open-vs-closed TCP offset) from this floor so the OPEN fingertips reach the plate instead of clamping ~22mm high.
+  table_safety_margin_m: 0.003               # Floor sits this far ABOVE the calibrated surface_z (less negative). Used when recording table_plane.json via POST /api/calibrate_table.
+  # Enable once the wrist RealSense is replugged and hand-eye calibrated.
+  wrist_refine: false
+
+# Grasp tuning. Read by control/executor_core.py:_apply_family_tuning and used
+# by the grasp primitive (control/executor_grasp.py). Overrides the class-const
+# defaults for THIS rig; omit a key to keep the code default. Env vars
+# (SPARK_GRASP_*) still override these at runtime for quick debugging.
+grasp:
+  depth_m: 0.022          # descend below perceived top before clamping (TCP open/closed offset)
+  # force-verify: peak |dF| below this (N) = empty air, not a grasp. 2.0 so
+  # the rig carries ONE threshold for this decision (legacy _verify_grasp
+  # also uses 2.0); a close-on-air transient measures ~0.6 N.
+  # gObj stays the primary signal, so light objects are still caught by it.
+  force_empty_n: 2.0
+  lift_check_m: 0.02      # confirming lift distance after clamp
+  lift_delta_min_n: 0.5   # extra downward pull the confirming lift must add (N)
+                          # for it to corroborate "holding". Two-sided: the old
+                          # max() fold could only ever ADD evidence for holding.
+  yaw_aspect_ratio_gate: 1.6  # only rotate the wrist (oriented grasp) above this AR.
+                              # TEMP 1.6 (was 1.8) to catch the gold blocks whose AR
+                              # under-reads at ~1.7; real fix is the OBB/AR estimate.
+                              # AR alone cannot tell a tool from a soft blob, so the
+                              # two floors below gate the SAME decision on input
+                              # quality; the planner can also name a strategy
+                              # outright (grasp_strategy on a grasp node).
+  yaw_min_conf: 0.45          # auto route: below this detection confidence, no OBB
+                              # yaw. The plushie measured AR 3.14 at conf 0.24 and
+                              # earned a -68.9 deg wrist rotation off a meaningless
+                              # OBB angle. Set 0.0 to restore the old behaviour.
+  yaw_min_obb_conf: 0.40      # auto route: below this OBB-axis confidence, no yaw.
+                              # ABSENT (perception did not measure it) is treated as
+                              # unknown, not as a veto.
+  max_yaw_offset_deg: 100     # wrist-3 cable limit for the oriented grasp (135
+                              # exceeds what the wrist-camera USB cable tolerates).
+                              # A two-jaw gripper is symmetric mod 180, so a target
+                              # near +-90 has an equivalent on the other side. At a
+                              # 90 cap the nearer equivalent is refused for being a
+                              # few degrees over and the wrist takes the LONGER path
+                              # (measured: grasp +14.1, place -87.1; the equivalent
+                              # +92.9 is 78.8 deg of travel, refused by 2.9, so the
+                              # wrist swung 101 deg). 100 keeps the cable guard and
+                              # stops it defeating itself. THIS VALUE WINS over the
+                              # class constant in executor_motion.
+
+# ---------------------------------------------------------------------------
+# Task-success verification (control/success_verifier.py)
+# ---------------------------------------------------------------------------
+# The ONLY thing that decides whether a task succeeded. Cheap proprioceptive
+# gates run first (grasp / transport / release); only if they are clean does
+# each camera INDEPENDENTLY judge the predicate list, and the per-camera
+# verdicts are fused. Tri-state: pass | fail | unverified. `unverified`
+# neither reinforces nor suppresses a BT-library row.
+verification:
+  enabled: true
+  min_conf: 0.35              # detection confidence floor for a camera to vote.
+                              # A FLOOR only: it can tighten a planner-supplied
+                              # block, never loosen it.
+  require_two_views: false
+  inside_xy_margin_m: -0.02   # negative SHRINKS the container footprint, so an
+                              # object on the rim does not count as inside
+  inside_z_tol_m: 0.06        # doubled automatically on DA3 (monocular) depth
+  # Image-space containment fallback, used only when a camera has no 3D for
+  # the object or the container. SHIPPED OFF (> 1.0 = the branch abstains).
+  # Replayed over 70 corpus episodes x 3 cameras it passed 6 temporal
+  # NEGATIVES against 1 true positive, and 2D-failed 42 true positives -- as a
+  # veto it suppresses real successes. Set 0.90 to re-enable.
+  fallback_2d_containment: 1.01
+  on_missing: unverified      # never "pass"; the value "pass" is rejected at load
+
+  # Close the loop: a verified failure is CORRECTED, not just logged. Measured:
+  # birdview called inside(stuffed animal, blue bowl) fail at
+  # conf 0.91 (xy_ok=False, dz=+5.1cm), sideview abstained, and the run simply
+  # ended with the plushie on the table.
+  #
+  # This is opt-in because the replay is real motion that OPENS THE GRIPPER
+  # (see control/executor_verify.py). It is safe to opt in here because the
+  # replay path now (a) establishes the arm state -- jaws open, CONFIRMED
+  # empty, tool lifted clear -- before any lateral move, (b) re-perceives the
+  # pick target and refuses to move if that re-detection found nothing, and
+  # (c) only ever runs on an EVIDENCED `fail`; `unverified` never moves the arm.
+  #
+  # retry_max_attempts is the hard bound on that loop. 1: one automatic
+  # correction cycle. A second attempt buys no new information -- if a
+  # re-perceived re-grasp still misses, the fault is perception or geometry,
+  # not luck -- while it doubles the unattended motion on a live arm. Raise
+  # deliberately, never above 3.
+  retry_on_fail: true
+  retry_max_attempts: 1
+
+  # How MUCH perception a verification is allowed to ask for
+  # (control/verify_scope.py). Measured: one
+  # verify_placed(plushie, bowl) cost 7 SAM3 inferences and 54 SECONDS against
+  # an 8s primitive budget, so the watchdog aborted the run before the operator
+  # could -- and the answer was `abstain` anyway, because the cross-camera
+  # merge had deduped the placed plushie against the bowl it was sitting in.
+  #
+  # STOPGAP: `enabled: false` restores that behaviour exactly. Nothing else
+  # here needs changing to get the old shape back.
+  scope:
+    enabled: true
+
+    # Jaws that still read HOLDING after a release are positive evidence the
+    # place failed: 0 captures, 0 inferences. The converse is NOT claimed --
+    # open jaws over a container do not prove the object stayed in it, so the
+    # not-holding branch still runs vision.
+    telemetry_short_circuit: true
+
+    # Reuse frames younger than this instead of re-grabbing every camera, and
+    # memoise the detections computed from them. Hard ceiling 5.0s.
+    #
+    # 0.0 = OFF, and it should stay off on a live arm. This is the one cut here
+    # that can be WRONG rather than merely blind: a frame taken before the jaws
+    # opened shows the object still in the gripper and is indistinguishable
+    # from a current one. pipeline.capture() is called by re-detection, failure
+    # snapshots and the detect routes (the camera STREAM does not touch it), so
+    # a pre-release frame inside the window is possible on a busy server.
+    # Raise it only for a static scene -- e.g. re-verifying an idle arm.
+    reuse_capture_s: 0.0
+
+    # Skip re-detecting a reference (container / surface / base / target) the
+    # tree never displaced, and take its pose from the plan-time map -- which
+    # is the frame the verifier prefers anyway, because the object we just
+    # placed occludes the container's interior and walks its centroid off by
+    # more than its own radius (see control/success_verifier._bind_reference).
+    #
+    # OFF for the task verdict: the presence check is load-bearing there
+    # ("plan-time geometry is a reference frame, not a licence to skip seeing
+    # it" -- tests/test_container_reference_frame.py). ON for the verify_placed
+    # LEAF, which has a 25s budget, exists only to catch a positive failure,
+    # and is followed by the task verdict that does still check presence.
+    anchor_references: false
+    condition_anchor_references: true
+
+    # The ASPIRE fusion gate on the verify path. OFF: its reprompts are extra
+    # SAM3 passes (3 of the logged run's 7, all rejected), and no predicate
+    # reads a fusion field -- the gate repairs GRASP geometry, which
+    # verification does not compute.
+    fusion: false
+
+    # auto = do not detect on a camera the labels provably do not project into
+    # (an unknown projection keeps the camera, and an empty result falls back
+    # to all of them). all = every captured camera, as before.
+    cameras: auto
+
+  # Per-release two-anchor verdict + rebind (sim post_release_capture port,
+  # control/execution_recovery.verify_placement). After every release the
+  # object is re-detected: within the sticky gate of the release point ->
+  # ok (+xy error); within gate of the pre-place origin -> still_at_origin
+  # (release gate votes fail -- real evidence for the replay); else ABSTAIN.
+  # Separately the placed label is REBOUND to the nearest fresh instance to
+  # the release point at any distance (even on abstain), so a replay
+  # re-aims at where the object actually fell. The verdict is a
+  # per-primitive attribution signal only; the task verdict stays with the
+  # SuccessVerifier. OFF = trace-only capture.
+  # Env A/B: SPARK_RELEASE_VERDICT.
+  release_verdict: false
+
+  # Lowest-responsible-layer attribution (sim ANCHOR port,
+  # control/attribution.py) at the recovery seams: PERCEPTION -> skip the
+  # in-place perturb and re-ground; EXECUTION -> the existing local ladder;
+  # PLAN -> stop and surface to the operator (NEVER an autonomous replan).
+  # OFF = the hardcoded ladder. Env A/B: SPARK_ATTRIBUTION.
+  attribution: false
+
+# ASPIRE per-primitive traces: one JSON per primitive under
+# output/<ts>/trace/, so a failure is attributable to a primitive rather than
+# to the rollout. save_images additionally dumps perception overlays.
+trace:
+  enabled: true
+  save_images: false
+
+# Stack / place tuning (force-guided descent onto a target's top).
+# Place-time release behavior (control/executor_motion._place_release_z).
+place:
+  # Give back the ACTUAL grasp depth at release. The drop
+  # model otherwise assumes the TCP closed at perceived_top +
+  # GRIPPER_OPEN_Z_OFFSET; the real grasp descends further (grasp depth_m,
+  # learned per-label offsets, recovery Z bias), so gripping N cm lower
+  # silently released N cm high. ON: held_drop is computed from the TCP z
+  # recorded at jaw close. The rim/interior bounds and the plan-strict /
+  # plan-no-geometry branches still govern either way. OFF = the constant.
+  # Env A/B: SPARK_RELEASE_GIVEBACK.
+  release_giveback: false
+
+stack:
+  clearance_m: 0.12       # begin the descent this far above the target's detected top
+  max_descent_m: 0.15     # descent safety cap
+  contact_force_n: 5.0    # force-DELTA (baseline-subtracted) that counts as contact
+  hard_stop_delta_n: 25.0 # force-DELTA emergency stop -- NOT absolute fz (that carried
+                          # the ~69N gripper-weight offset and hard-stopped on step 1)
+  step_m: 0.004           # slow final-approach step size
+  approach_gap_m: 0.02    # fast pre-approach stops this far above expected contact
+  descent_vel_frac: 0.10  # slow final-approach velocity fraction
+
+# Per-primitive wall-clock budgets (seconds), from the paper appendix.
+# Loaded once at ScoreExecutor init (control/primitive_timeouts.py) and
+# enforced at the dispatch choke point: a budget overrun aborts the motion
+# via executor.abort() (the /api/stop path) and routes the failed result
+# into the EXISTING recovery layer, not a trial termination. `default`
+# covers unlisted primitives; `constrained_scrub` carries the paper's
+# `wipe` budget (`wipe` is its planner-grammar alias).
+timeouts:
+  # Watchdogs for true hangs, not speed limits. The UR10e solves IK on the
+  # controller (movej(p[...]) firmware IK) at full speed, so a home->object
+  # approach is a few seconds; these give comfortable margin without masking
+  # a real hang.
+  move_to_keypoint: 30.0   # a large oriented-grasp YAW via the Cartesian servo
+                           # takes ~8.6s to converge on top of lift+approach.
+                           # (Switching yaw to joint-space movej will let this
+                           # drop.)
+  move_relative: 10.0   # a 20cm lift via movej (upload lag + wait) needs headroom
+  # The Robotiq 2F-85 close is a blocking rq_move_and_wait plus a squeeze +
+  # re-squeeze with 1.5s/1.0s settles, so a real grasp takes ~5s of mostly
+  # WAITING for the gripper (little arm motion). The sim's 1.0s killed it
+  # mid-squeeze before verification ever ran.
+  grasp: 25.0
+  # A plain release (open + settle + witness) fits in 6s. A TILTED release
+  # does not: reorient movel + insertion descent + open + settle + witness,
+  # each preceded by an RTDE script re-upload when the gripper's URScript
+  # killed it. A tilted pen release has been aborted by a shorter budget 4.9s
+  # in, mid-insert, so recovery re-ran and released top-down, which read as
+  # "the pitch never happened". The budget is a hang watchdog,
+  # not a speed limit; 20s is comfortably above a real tilted release and far
+  # below a wedged arm.
+  release: 20.0
+  # stack places via a force-monitored stepped descent (up to ~75 small steps,
+  # ~0.7s each) that stops early on contact -- but a full descent to a low
+  # target legitimately needs ~50s. The 8.0s default aborted it mid-descent.
+  stack: 60.0
+  # The two CONDITION leaves. Neither moves the arm; their cost is perception
+  # and proprioception. Sized to the measured scoped cost, not to a round
+  # number -- see control/primitive_timeouts.NON_PAPER_TIMEOUTS_S for the
+  # arithmetic. Shrink verify_placed as raw SAM3 latency comes down.
+  verify_placed: 25.0
+  verify_grasp: 5.0
+  insert: 10.0
+  push_object: 8.0
+  open_drawer: 10.0
+  wipe: 10.0
+  constrained_scrub: 10.0
+  default: 8.0
+  # Generous budgets for the long composite primitives in this deployment's
+  # grammar (not in the paper's simple table). The 8.0s default would kill
+  # these legitimately-long skills mid-run; these entries keep the watchdog as
+  # a true-hang catch rather than a premature abort.
+  grasp_se3: 90.0
+  cloth_fold: 180.0
+  cloth_fold_single: 90.0
+  hem_press: 60.0
+  pants_fold: 180.0
+  sweep: 120.0
+  pour: 60.0
+  place_in_slot: 60.0
+  search_keypoint: 60.0
+  retract_retry: 60.0
+  sponge_wash: 150.0
+  rinse: 90.0
+  pour_to_level: 60.0
+  sweep_to_container: 120.0
+  constrained_scrub_oscillating: 60.0
+  compliant_insert: 60.0
+  pen_write: 120.0
+  throw_to: 30.0
+
+# Role-keyed camera roster read by perception/camera_registry.py.
+#
+# This file describes the host UR10e cell (the only UR10e rig). Same
+# hardware family as the Franka cell: two external Azure Kinects plus an
+# optional wrist RealSense. The top-level kinect_* fields below stay
+# authoritative for the live open path (sync mode, depth mode, retry);
+# these entries are the config-driven roster every downstream user looks
+# cameras up by.
+#
+# Hardware state enumerated on host 2026-06-04 (second pass): TWO
+# Kinects connected, 000000000000 and 000000000000 (the latter is the
+# unit previously mounted as the FR3 rig's birdview). Role assignment
+# verified against camera captures 2026-06-04 (626 birdview, 627
+# sideview); the live server runs green with both. Hand-eye calibration
+# still pending on this rig. The wrist RealSense (D435i, 8086:0b3a) IS
+# physically plugged into a USB 3.0 port (verified 2026-06-22) but stays
+# disabled: uvcvideo is blacklisted on this host, so it enumerates with
+# Driver=[none] and no /dev/video* nodes until the modprobe + per-device
+# unbind sequence is run. Flip enabled:true only after that is in place.
+cameras:
+  # Role<->serial verified against captures 2026-07-15: 627 is the ELEVATED
+  # unit looking down over the robot mount (birdview), 626 is the
+  # across-the-table unit (sideview). The previous roster (626 bird / 627
+  # side) was backwards vs the physical mounting.
+  - role: "birdview"
+    type: "kinect"
+    serial: "000000000000"   # elevated unit over robot mount (ex FR3 birdview)
+    sync: "master"
+  - role: "sideview"
+    type: "kinect"
+    serial: "000000000000"   # across-table unit (enumerated on host 2026-06-04)
+    sync: "subordinate"
+  - role: "wrist"
+    type: "realsense"
+    serial: "000000000000"   # D435i on host (enumerated 2026-06-29)
+    width: 640
+    height: 480
+    # Enabled for the demo wrist view. Works out of the box since Jul 2026:
+    # librealsense is the RSUSB (libusb) build installed to /usr/local, so no
+    # uvcvideo/kernel driver is needed (uvcvideo stays blacklisted for Kinect
+    # safety). scripts/wrist_realsense.sh is obsolete -- do NOT run `enable`.
+    enabled: true
+
+# Kinect configuration (birdview + optional sideview)
+#
+# THESE KEYS ARE DELIBERATELY EXPLICIT. Left unset, both cameras silently get
+# the max-bandwidth PipelineConfig defaults
+# (1080P / 30 fps) on a host where BOTH Kinects and the wrist RealSense hang
+# off ONE xHCI controller (0000:00:14.0). Microsoft's guidance is one host
+# controller per Kinect at high resolution / high frame rate. Raise these
+# only after each Kinect has its own controller.
+# See docs/MULTICAM_CRASH_MECHANISM.md.
+#
+#   kinect_depth_mode: WFOV_2X2BINNED  120 deg FOV, 512x512 -- keeps the
+#     whole cell in one camera. NFOV_2X2BINNED (320x288, 75x65 deg) is the
+#     next step down on bandwidth if the cell fits the narrower FOV.
+#   kinect_resolution: 720P  halves the isochronous reservation vs 1080P.
+#   kinect_fps: 15  halves depth/IR bulk traffic AND depth-engine GPU
+#     dispatches; matches the franka rig and published multi-Kinect rigs.
+kinect_depth_mode: WFOV_2X2BINNED
+kinect_resolution: 720P
+kinect_fps: 15
+kinect_use_hw_sync: false
+# Master serial. With kinect_use_hw_sync false the open path still runs
+# STANDALONE, but pipeline_init._init_kinects_from_early uses this serial
+# to NAME the sideview camera ("" would name both Kinects birdview and the
+# sideview role would never register). 000000000000 = sideview, verified
+# against camera captures 2026-07-15; matches the roster above.
+kinect_master_serial: "000000000000"
+
+# VLA policy settings (inference; see control/vla_controller.py).
+vla:
+  policy_type: "pi05"  # pi05, openvla, or custom
+  control_frequency: 10  # Hz
+  action_horizon: 16     # Chunk size
+
+# ---------------------------------------------------------------------------
+# Demonstration recording (spark_real/recording/)
+# ---------------------------------------------------------------------------
+# Episodes are written in the SAME on-disk schema as the human teleop corpus:
+#
+#   <data_dir>/<task string, verbatim>/episode_NNNN/
+#       images/{camera_0,camera_1,wrist}/frame_NNNN.jpg
+#       trajectory.npz  metadata.json  episode_video.mp4  trajectory_plot.png
+#
+# so a policy trained on SPARK-generated demos and one trained on operator
+# demos differ ONLY in who drove the arm. Started either by
+# POST /api/vla_record/start (operator drives) or by an /api/execute request
+# with record_demo=true (SPARK's executor drives).
+#
+# data_dir lives OUTSIDE the repo so datasets never land in git.
+# Every value below is already the built-in default in
+# recording/settings.py; they are spelled out here to be discoverable.
+recording:
+  data_dir: "/data/spark_episodes"
+  record_hz: 15                 # matches the human corpus (14.97 measured)
+
+  # SPARK camera key -> human episode slot. VERIFY against a live
+  # /api/capture before the first session: if the Kinects were re-mounted or
+  # re-enumerated this mapping flips and every episode is mislabeled.
+  camera_map: {sideview: camera_0, birdview: camera_1, wrist: wrist}
+  # Slots a policy actually trains on. ALL available slots are still written
+  # to disk; this only narrows what the dataset loader hands to training.
+  train_cameras: ["camera_1", "wrist"]
+
+  # Slots an episode must contain ON DISK for the training converter to ingest
+  # it -- it SKIPS any episode missing a camera directory, and you would not
+  # find out until conversion time, long after the scene is gone. Default is
+  # every slot in camera_map. With the sideview Kinect unplugged, either narrow
+  # this to ["camera_1", "wrist"], or leave it and let the recorder black-fill
+  # camera_0 (DROID's convention for an absent third camera). Either way the
+  # substitution is recorded in metadata.spark.synthetic_cameras, never silent.
+  required_cameras: ["camera_0", "camera_1", "wrist"]
+  # fill = black-fill an absent required slot; fail = mark the episode unsuccessful.
+  missing_camera_policy: "fill"
+
+  image_size: [640, 480]
+  jpeg_quality: 95
+
+  # `native` logs the wx/wz action channels the executor actually commanded.
+  # The human corpus has them identically zero across all 60417 frames (the
+  # operator drove those tasks top-down and only ever pitched, on the pen), but
+  # SPARK does use them: _oriented_grasp rotates the wrist to close
+  # perpendicular to an object's major axis, and the tilt-release rule rolls
+  # when placing elongated objects. Zeroing them here would write an action
+  # vector contradicting what the arm did and what the video shows -- a label
+  # error, not a distribution shift. Enforce parity at execution time (keep the
+  # motion top-down) rather than by lying in the log. `human_parity` remains
+  # available as an explicit ablation.
+  action_profile: "native"
+  action_ema_alpha: 0.4         # the human producer's action filter
+  action_deadband: 1.0e-4
+  linear_velocity_clip: 0.2     # m/s, per axis
+  angular_velocity_clip: 0.3    # rad/s, per axis
+  gripper_ramp_rate: 1.0        # units/s; humans ramp, they do not step
+
+  # A dropped camera frame writes a black placeholder so the npz row and the
+  # image index never de-align. More than this many marks the episode failed.
+  max_black_frames: 0
+
+  # true forces approach/descend through the Cartesian servo so a genuine
+  # COMMANDED velocity exists at every 15 Hz tick (what the human actions
+  # array holds). false leaves the movej/movel path in place and the recorder
+  # falls back to the measured twist, which it records honestly in
+  # trajectory.npz:action_source and in metadata.spark. Changes execution
+  # timing -- shake down one supervised run per task before batching.
+  demo_mode: false
+
+  emit_video: true              # episode_video.mp4 (QA only)
+  emit_plot: true               # trajectory_plot.png (QA only)
+
+# ---------------------------------------------------------------------------
+# Behavior-tree cache (spark_real/bt_library.py)
+# ---------------------------------------------------------------------------
+# Capture once, reuse forever: the first verified run of a task stores its
+# tree, and every later run of that task is served from disk with zero LLM
+# calls, across server restarts. Repeatability is the point -- a demo corpus
+# where the plan varies run to run is not a controlled comparison.
+bt:
+  library_dir: null          # null => <output_dir>/../bt_library
+  seed_dir: null             # null => the packaged configs/bt_seeds
+  # OFF while collecting the demonstration corpus: a seeded tree is
+  # cache-eligible immediately, so the task would be served from disk and the
+  # run we meant to plan fresh would never call the planner. Flip back to true
+  # once the corpus is recorded and you want first-request cache hits again.
+  seed_on_start: false
+  # auto       : cache first, LLM on a miss
+  # cache_only : a miss RAISES; never silently reaches for the LLM
+  # llm        : ignore the cache entirely
+  plan_mode: "auto"
+  min_similarity: 0.75       # Jaccard floor; below it is a miss, not a hit
+  auto_promote_after: 3      # clean successes before an entry auto-promotes
+
+# Frozen per-task SAM3 prompt contracts: prompts, expected object counts, and
+# a deterministic geometric instance ordering so "blue block 1" is the same
+# physical block every run. null => the packaged configs/tasks/*.yaml.
+# Also overridable by $SPARK_TASK_PROMPTS.
+task_prompts_dir: null
+
+# ---------------------------------------------------------------------------
+# Detection conditioning (ASPIRE search / observe / REPROMPT / recover)
+# ---------------------------------------------------------------------------
+# LIVE. Consumed by pipeline_perception.detection_gate(), which runs inside the
+# real detect() loop and stamps low_quality / fused_confidence / axis_trust onto
+# every detection before the merge, the planner or the executor sees it.
+# grasp_strategy.resolve_strategy reads all three (yaw_min_conf /
+# yaw_min_obb_conf above), so a low-confidence blob or an unstable mask axis
+# gets a top-down grasp instead of an invented wrist yaw.
+#
+# TO TURN IT ON: set `fusion.enabled: true` below, or SPARK_DETECTION_FUSION=1.
+# Everything under `fusion:` defaults to the OFF / no-change behaviour.
+perception:
+  reprompt_min_conf: 0.40      # -> fusion.low_quality_conf
+  reprompt_max_attempts: 2     # ASPIRE reprompt budget per detection
+
+  # Sticky (gated, held-suppressed) re-detect adoption (sim-validated:
+  # refusing to adopt took t1 from 0/15 to 12/15). When enabled, every
+  # re-detect adoption site (pre-approach,
+  # post-release thread, retry re-perception) refuses to rewrite the
+  # detection map for a HELD label, dedups near-duplicate masks, holds the
+  # binding on in-gate ambiguity, and NEVER adopts a candidate outside
+  # gate_m of the last bound position (keep-old-position instead).
+  # Distances below are the sim-tuned defaults and MUST be re-measured on
+  # this rig (per-camera disagreement is 1-2 cm here). OFF =
+  # nearest-candidate-at-any-distance adoption. Env A/B: SPARK_STICKY.
+  # Universal pre-approach re-bind (execution_recovery.rebind_before_approach):
+  # re-detect the bound label before EVERY approach so a target moved by a
+  # human becomes a silent parameter update on the same tree, not a failed
+  # attempt + recovery. Adoption is gated by the sticky block below; this
+  # only controls whether the unconditional re-detect runs and when drift is
+  # worth a log line.
+  rebind:
+    enabled: true
+    log_drift_cm: 2.0
+  sticky:
+    enabled: false
+    gate_m: 0.12               # max displacement a re-detect may adopt
+    ambiguity_sep_m: 0.03      # two in-gate candidates closer than this
+                               # to EACH OTHER are undecidable -> hold
+    dedup_radius_m: 0.02       # merge radius for duplicate-mask suppression
+  fusion:
+    enabled: true              # master switch for the whole gate. ON: the
+                               # plushie case (SAM3 conf 0.24, aspect_ratio
+                               # 3.14 -> a 69 deg wrist rotation off a
+                               # meaningless OBB) is only actually fixed while
+                               # this is true. Set false to restore the old
+                               # confidence handling.
+    # Overwrite `confidence` with the pooled number as well as publishing
+    # fused_confidence. OFF: it changes what the planner prompt reports.
+    write_confidence: false
+    # Second-opinion box detector. null (default) = mask-quality signal only,
+    # which needs NO model and is a complete path on its own. A backend that is
+    # named and enabled but cannot be built RAISES -- it never degrades to a
+    # detector that silently sees nothing. `torchvision` runs in spark_conda
+    # today off the cached COCO weights. `rfdetr` is installed in spark_conda
+    # (pip install rfdetr; weights cached at ~/.roboflow/models/).
+    proposer:
+      backend: rfdetr          # null | torchvision | rfdetr
+      enabled: true
+      device: cpu              # cpu on purpose: the live server owns the GPU
+      threshold: 0.35
+      # WHICH LABELS THIS DETECTOR IS ALLOWED AN OPINION ON.
+      #
+      # Being in the closed COCO vocabulary is necessary but NOT sufficient. A
+      # label can be in the set and still be one RF-DETR is bad at, and then
+      # its silence is scored as DISAGREEMENT and subtracts miss_penalty from a
+      # correct SAM3 mask. MEASURED on real frames of "pick up the plushie
+      # and place in the bowl", both cameras: "plushie" is
+      # not a COCO class but resolves into COCO through the "teddy bear" entry
+      # of box_proposals.DEFAULT_SYNONYMS, so it counted as in-vocabulary;
+      # RF-DETR boxed no teddy bear on either camera, and the gate docked a
+      # correct mask 0.95 -> 0.92 (sideview) and 0.20 -> 0.14 (birdview, under
+      # the verify gate's 0.35 min_conf). On the SAME two frames it scored the
+      # bowl 0.94 / 0.91 and correctly lifted it to 0.98 / 0.99.
+      #
+      # A label NOT listed here takes the ABSTAIN path whole: no association,
+      # no agree bonus, no miss penalty, fused_confidence == SAM3's own number.
+      # An EMPTY or ABSENT list restores the old behaviour (every in-vocabulary
+      # label consulted), so this is opt-in.
+      #
+      # Matching reuses the vocabulary lookup itself (_canonical_class), so one
+      # entry covers the synonyms, regular plurals, "bowl 2" instance suffixes
+      # and "knife handle" sub-part prompts SAM3 is really asked for. Irregular
+      # plurals ("knives") do not resolve -- they already abstain by
+      # vocabulary, which is the safe direction.
+      labels:
+        - fork                 # corpus "put the fork in the tray". COCO-native
+                               # and a utensil on a bare table is squarely what
+                               # this detector was trained on.
+        - knife                # corpus "put the knife in the tray".
+        - spoon                # corpus "put the spoon in the tray".
+        - bowl                 # corpus "... place in the bowl". MEASURED 0.939
+                               # / 0.913 on the real frames above: the one
+                               # label the second opinion has actually earned
+                               # on this rig.
+        - cup                  # COCO-native container; same class family as
+                               # bowl and detected as reliably.
+        - bottle               # COCO-native, large and unambiguous.
+        - wine glass           # COCO-native; two-word class, matched verbatim.
+        - scissors             # COCO-native tool, well represented in COCO.
+        # Synonyms the codebase already maps (box_proposals.DEFAULT_SYNONYMS).
+        # They canonicalise onto the classes above, so listing them changes
+        # nothing; they are here so an operator who prompts SAM3 with "mug" or
+        # "dish" can see the label is covered without reading the synonym map.
+        - dish                 # -> bowl
+        - mug                  # -> cup
+        - blade                # -> knife
+        # DELIBERATELY ABSENT:
+        #   plushie / teddy bear -- the measured failure above.
+        #   tray / bin / container / block / pen / cube -- not COCO at all, so
+        #     they already abstain by vocabulary; listing them would imply a
+        #     competence this detector does not have.
+        #   dining table -- RF-DETR boxes the whole table at 0.60-0.74 on every
+        #     frame here. It is never a SAM3 prompt on this rig and must not
+        #     become one.

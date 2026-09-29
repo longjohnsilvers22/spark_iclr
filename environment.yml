@@ -1,0 +1,73 @@
+name: spark_conda
+# NOTE: torch must be installed via the pytorch.org cu130 wheel index, NOT pip
+# defaults - `conda env create -f environment.yml` will install pip then defer
+# to setup_spark_conda.bash for the torch step. Or run setup_spark_conda.bash
+# directly which does everything.
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+    # Core simulation
+    - mujoco==3.3.7
+    # 3.1.0 lacks OpenGL.EGL.EGLDeviceEXT and breaks MUJOCO_GL=egl imports
+    - PyOpenGL==3.1.10
+    - tyro==1.0.12
+    - fastapi==0.136.3
+    - uvicorn==0.47.0
+    - pydantic==2.12.5
+    - websockets==16.0
+    - h5py==3.16.0
+
+    # Perception (SAM3 + EquiGraspFlow)
+    # torch + torchvision installed separately from cu130 index by
+    # setup_spark_conda.bash - DO NOT add them here, the pip resolver
+    # will pick a non-CUDA wheel.
+    - opencv-python==4.13.0.92
+    - pillow==12.1.1
+    - scipy==1.17.1
+    - scikit-image==0.26.0
+
+    # SAM3 and depth estimation
+    # sam3 installed editable from source: ~/mv_sam3/sam3
+    # DA3 monocular depth bundled with SAM3
+
+    # LLM planning
+    - google-generativeai==0.8.6
+    - google-genai==1.75.0
+
+    # Video recording
+    - imageio==2.37.3
+    - imageio-ffmpeg==0.6.0
+
+    # Utilities - numpy pinned to 1.26.4 to avoid EquiGraspFlow numpy 2.x issue
+    - numpy==1.26.4
+    - matplotlib==3.10.8
+    - pyyaml==6.0.3
+    - requests==2.33.1
+    - tqdm==4.67.3
+
+    # Joint-space IK (pyroki + jaxls); the executor falls back to the
+    # Cartesian servo without these
+    - jax==0.10.2
+    - jaxlie==1.5.0
+    - git+https://github.com/brentyi/jaxls.git@50a58be88c5ef74532f09e3f55268b4f02c490e3
+    - git+https://github.com/chungmin99/pyroki.git@388e43e1fc0d0ee382968d3dd72970fd62a0450c
+    - viser==1.0.30
+    - yourdfpy==0.0.60
+    - robot_descriptions==2.0.0
+    - jax_dataclasses==1.6.3
+
+    # EquiGraspFlow deps
+    - omegaconf==2.3.0
+    - hydra-core==1.3.2
+    - e3nn==0.6.0
+    - open3d==0.19.0
+    - tensorboardX==2.6.5
+    - roma==1.5.6
+
+    # Real-robot driver (Franka FR3 - only needed on the rig)
+    # franky-control installed from local wheel: ~/franka/wheels/franky_control-1.1.3-cp312-cp312-manylinux_2_34_x86_64.whl
+    # ocnn installed from git (pinned commit) via setup_spark_conda.bash

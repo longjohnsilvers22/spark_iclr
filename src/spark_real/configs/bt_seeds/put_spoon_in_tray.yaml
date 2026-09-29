@@ -1,0 +1,43 @@
+# Task 3 of the human-parity demo set: "put the spoon in the tray".
+#
+# Grasp label is "spoon handle", NOT "spoon": the bare noun grounds on the
+# bowl of the spoon, which the gripper cannot close on cleanly.
+instruction: "put the spoon in the tray"
+aliases:
+  - "pick up the spoon and place it in the tray"
+  - "put the spoons in the tray"
+  - "place the spoon in the tray"
+objects: ["spoon handle", "tray"]
+priority: 10
+promote: true
+verified: false
+provenance: >-
+  Structure captured verbatim from the verified knife run 0b20251e4902
+  ("pick up knife and place it in the tray", success=1 fail=0) with the
+  grasp label swapped knife handle -> spoon handle. The same
+  grasp/lift/move/release sequence also ran successfully as
+  ae5155e5cbc4 ("pick up spoons and place them in the tray slot",
+  success=1) with spoon labels, so both the structure and the labels
+  have run green -- just never in this exact combination.
+notes: >-
+  verified:false because this precise (task, label) pairing has not been
+  confirmed on the rig. Run it once supervised; the success feedback marks
+  it and it auto-promotes at 3 clean runs. Do NOT seed from library entry
+  ba515a474e5e ("put the spoons in the tray", success=1) -- that tree is a
+  bare `wait` node that was mis-recorded as a success by the dry-run
+  accounting bug this change fixes.
+score:
+  task: "put the spoon in the tray"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "spoon handle", offset_z: 0.0}
+      - type: grasp
+        params: {force: 50, target_width: 0.01}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: move_to_keypoint
+        params: {keypoint_label: "tray", offset_z: 0.05}
+      - type: release
+        params: {tilt_angle: 0.0}

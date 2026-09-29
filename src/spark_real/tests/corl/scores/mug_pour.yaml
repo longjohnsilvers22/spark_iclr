@@ -1,0 +1,33 @@
+# CoRL: mug handle pour task.
+# Side grasp on the mug HANDLE (not the body), then pour into bowl.
+# Exercises:
+#   - grasp_se3 (strategy=horizontal) -- side approach to grab handle
+#   - pour                            -- tilt to pour into bowl
+#   - release                         -- open gripper
+#
+# The handle sticks out from the mug body at +X. The gripper approaches
+# from +X (outside the handle) pointing -X (toward the mug center).
+# Approach direction (-1, 0) means TCP-Z = -X_world (horizontal side).
+# target_width = 16mm (handle is 16mm thick = 2 * 8mm half-size).
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "mug handle"
+        strategy: horizontal
+        object_height_m: 0.090
+        force: 80
+        target_width: 0.020
+        pre_grasp_distance: 0.12
+        approach_dir_x: -1.0
+        approach_dir_y: 0.0
+    - type: pour
+      params:
+        source_label: "mug handle"
+        target_label: bowl
+        pour_angle_rad: 0.785
+        target_fill_fraction: 0.7
+        max_pour_s: 4.0
+    - type: release
+      params: {}

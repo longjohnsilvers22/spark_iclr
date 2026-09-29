@@ -1,0 +1,134 @@
+# Unitree G1 humanoid default configuration for SPARK
+# Workspace numbers are in the body frame (chest centre, +x forward,
+# +y left, +z up).  Joint limits taken from the URDF distributed with
+# the Robotics-Ark/ark_unitree_g1 wrapper (urdf/g1_description.urdf);
+# they match the values in the Unitree G1 datasheet.
+
+robot:
+  variant: "G1-EDU-29DOF"          # see open question: confirm vs G1-base
+  dof: 29                          # 23 or 29; 29 = both wrists active
+  net_iface: "eth0"                # NIC connected to the G1 (sudo ip a)
+  dds_domain_id: 0
+  control_rate_hz: 50              # upstream g1_arm7_sdk_dds_example uses 0.02s
+
+# ---------------------------------------------------------------------------
+# Arms.  Indices follow the upstream G1JointIndex enum
+# (see g1_driver.py / g1_arm7_sdk_dds_example.py:21-60).
+# ---------------------------------------------------------------------------
+arms:
+  default_kp: 60.0                 # upstream arm7 example
+  default_kd: 1.5
+  joint_limits_rad:
+    # Conservative pulls from the public G1 datasheet (radian, [min, max]).
+    # TODO: verify on upstream URDF (`g1_description.urdf`).
+    shoulder_pitch: [-2.96, 2.79]
+    shoulder_roll:  [-1.59, 2.25]  # left; mirrored for right
+    shoulder_yaw:   [-2.62, 2.62]
+    elbow:          [-1.05, 2.09]
+    wrist_roll:     [-1.97, 1.97]
+    wrist_pitch:    [-1.61, 1.61]
+    wrist_yaw:      [-1.61, 1.61]
+  home_pose_left_rad:   [0.0, 0.30, 0.0, 0.90, 0.0, 0.0, 0.0]
+  home_pose_right_rad:  [0.0, -0.30, 0.0, 0.90, 0.0, 0.0, 0.0]
+
+# ---------------------------------------------------------------------------
+# Workspace bounds in the chest (root_link) frame.  These intentionally bias
+# toward the front-tabletop volume since SPARK is a manipulation system.
+# The bimanual cross-line (y=0) is kept inside the volume so the two arms
+# can meet in front of the chest.
+# ---------------------------------------------------------------------------
+workspace:
+  left_arm:
+    x_min: 0.10
+    x_max: 0.55
+    y_min: -0.05   # left arm may reach across the midline
+    y_max: 0.45
+    z_min: -0.10
+    z_max: 0.45
+  right_arm:
+    x_min: 0.10
+    x_max: 0.55
+    y_min: -0.45
+    y_max: 0.05    # right arm may reach across the midline
+    z_min: -0.10
+    z_max: 0.45
+  max_reach_m: 0.70   # shoulder -> EE rough max; refine after pinocchio FK
+
+# ---------------------------------------------------------------------------
+# End-effector.  Two SKUs are supported.  Only one of these blocks should be
+# active at a time; the BT executor consults this to decide whether to call
+# `set_left_gripper` (Dex3 multi-finger) or a binary grasp primitive.
+# ---------------------------------------------------------------------------
+grippers:
+  type: "dex3_1"          # one of: "dex3_1", "g1_parallel", "none"
+  dex3_1:
+    n_joints: 7           # upstream default HandCmd_ allocates 7 motor_cmd
+    kp: 1.5
+    kd: 0.2
+    open_q_rad: 0.0
+    closed_q_rad: 1.2     # conservative power grasp; TODO: per-finger refine
+    state_topics:
+      left:  "rt/dex3/left/state"
+      right: "rt/dex3/right/state"
+    cmd_topics:
+      left:  "rt/dex3/left/cmd"
+      right: "rt/dex3/right/cmd"
+  g1_parallel:
+    # G1 also ships with a simple 1-DOF parallel gripper variant.
+    # TODO: verify topic + IDL on upstream.  Likely shares HandCmd_ layout
+    # with motor_cmd[0] only.
+    n_joints: 1
+    open_q_rad: 0.0
+    closed_q_rad: 1.0
+
+# ---------------------------------------------------------------------------
+# Cameras --- G1 ships with binocular head cameras and (on the dexterous SKU)
+# one wrist camera per arm.  Topic names follow the convention used in
+# unitreerobotics/xr_teleoperate.  Verify against your hardware before use.
+# ---------------------------------------------------------------------------
+cameras:
+  - name: "head_left"
+    role: "head_stereo_left"
+    topic: "rt/camera/head/left/image_raw"   # TODO: verify on upstream
+    width: 1280
+    height: 720
+    fps: 30
+  - name: "head_right"
+    role: "head_stereo_right"
+    topic: "rt/camera/head/right/image_raw"
+    width: 1280
+    height: 720
+    fps: 30
+  - name: "wrist_left"
+    role: "wrist_left"
+    topic: "rt/camera/wrist_left/image_raw"
+    width: 640
+    height: 480
+    fps: 30
+  - name: "wrist_right"
+    role: "wrist_right"
+    topic: "rt/camera/wrist_right/image_raw"
+    width: 640
+    height: 480
+    fps: 30
+
+# ---------------------------------------------------------------------------
+# Safety --- specific to the G1.  These limits are NOT enforced on-robot;
+# the driver clamps targets before writing.
+# ---------------------------------------------------------------------------
+safety:
+  waist_yaw_max_rad: 0.50           # avoid 2dof->waist twisting under load
+  waist_torque_warn_nm: 30.0        # G1 waist motor is the weakest point
+  estop_fall_recovery_ms: 200       # how long to ramp arm_sdk back to 0
+  require_balance_stand: true       # refuse to enable arm_sdk if legs not up
+  # Upstream issue #108 confirms: low_level (full body) and BalanceStand are
+  # mutually exclusive; the supported tabletop combo is BalanceStand + arm_sdk.
+
+# ---------------------------------------------------------------------------
+# IK --- the upstream SDK has NO Cartesian endpoint.  Pick a solver.
+# ---------------------------------------------------------------------------
+ik:
+  backend: "pinocchio"              # one of: "pinocchio", "pyroki", "none"
+  urdf_path: "external/unitree_upstream_urdf/g1_description.urdf"  # TODO: copy
+  dual_chain: true
+  waist_coupling: "locked"          # one of: "locked", "shared", "free"

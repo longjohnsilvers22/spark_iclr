@@ -1,0 +1,9 @@
+# Detach uvcvideo from the Azure Kinect 4K color camera (045e:097d). libk4a
+# uses libusb directly; leaving uvcvideo bound to the same interfaces races
+# libusb and can corrupt the xhci TRB ring under sustained streaming.
+# Redundant when uvcvideo is blacklisted (see modprobe.d); kept for hosts that
+# still load uvcvideo for other cameras. Fires on bind, after uvcvideo claims
+# the interface, so the DRIVER match can resolve.
+ACTION=="bind", SUBSYSTEM=="usb", DRIVER=="uvcvideo", \
+    ATTRS{idVendor}=="045e", ATTRS{idProduct}=="097d", \
+    RUN+="/bin/sh -c 'echo %k > /sys/bus/usb/drivers/uvcvideo/unbind'"

@@ -1,0 +1,12 @@
+# Extra runtime dependencies for the bimanual_franka deployment only.
+#
+# These are lazily imported by the bimanual path
+# (robots/bimanual_franka/ssg48_gripper.py imports Spectral_BLDC), so
+# single-arm setups (franka, ur10e, g1) do not need them and importing
+# spark_real.server does not pull them in.
+#
+# Install on a bimanual host:  pip install -r requirements-bimanual.txt
+# Versions pinned to match the bimanual rig's spark_conda env.
+Spectral_BLDC==1.18
+python-can
+wrapt

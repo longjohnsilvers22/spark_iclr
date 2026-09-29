@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPARK - BT Execution Scores</title>
+<style>
+:root{
+  --bg-0:#080c10;--bg-1:#0c1018;--bg-2:#111820;--bg-3:#182030;
+  --border:#1c2636;--border-hi:#283848;
+  --tx-1:#c8d0d8;--tx-2:#6a7888;--tx-3:#3a4858;
+  --cyan:#5b8dbe;--cyan-15:rgba(91,141,190,.12);--cyan-30:rgba(91,141,190,.30);
+  --red:#f04040;--red-15:rgba(240,64,64,.12);
+  --green:#30c060;--green-15:rgba(48,192,96,.12);
+  --amber:#d4a020;--amber-15:rgba(212,160,32,.12);
+  --blue:#4090f0;
+  --mono:ui-monospace, SFMono-Regular, Menlo, monospace;--sans:system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r:5px;--fast:.15s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-0);color:var(--tx-1);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:48px;background:var(--bg-1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:12px}
+.brand b{font:600 14px var(--mono);letter-spacing:.02em;color:var(--cyan)}
+.brand .sep{width:1px;height:16px;background:var(--border-hi)}
+.brand span{font:500 12px var(--mono);color:var(--tx-2)}
+.top .right{display:flex;align-items:center;gap:14px}
+.summary{display:flex;gap:16px}
+.summary .m{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+.summary .m b{font:600 16px var(--mono);color:var(--tx-1)}
+.summary .m small{font:600 10px var(--mono);color:var(--tx-3)}
+
+.wrap{max-width:1200px;margin:0 auto;padding:20px}
+.intro{color:var(--tx-2);font-size:13px;margin-bottom:18px;max-width:760px}
+.controls{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+.controls input{flex:1;min-width:220px;font:500 12px var(--mono);background:var(--bg-2);color:var(--tx-1);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;outline:none}
+.controls input:focus{border-color:var(--cyan)}
+.controls label{display:flex;align-items:center;gap:6px;font:500 11px var(--mono);color:var(--tx-2);cursor:pointer;user-select:none}
+.controls input[type=checkbox]{accent-color:var(--cyan);width:14px;height:14px;flex:none;min-width:0}
+
+.grp{background:var(--bg-1);border:1px solid var(--border);border-radius:8px;margin-bottom:18px;overflow:hidden}
+.grp-head{display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;border-bottom:1px solid transparent}
+.grp-head:hover{background:var(--bg-2)}
+.grp.open .grp-head{border-bottom-color:var(--border)}
+.grp-caret{color:var(--tx-3);font-size:11px;width:12px;flex:none;transition:var(--fast)}
+.grp.open .grp-caret{transform:rotate(90deg)}
+.grp-title{flex:1;font:600 14px var(--sans);color:var(--tx-1)}
+.grp-meta{display:flex;align-items:center;gap:10px;flex:none}
+.pill{font:600 10px var(--mono);padding:3px 9px;border-radius:12px;white-space:nowrap}
+.pill.bts{background:var(--bg-3);color:var(--tx-2);border:1px solid var(--border-hi)}
+.pill.rate{border:1px solid transparent}
+.pill.rate.hi{background:var(--green-15);color:var(--green)}
+.pill.rate.mid{background:var(--amber-15);color:var(--amber)}
+.pill.rate.lo{background:var(--red-15);color:var(--red)}
+
+.bar{height:5px;border-radius:3px;background:var(--bg-3);overflow:hidden;width:90px;flex:none}
+.bar > i{display:block;height:100%;background:var(--green)}
+
+.bts{display:none;padding:14px 18px 18px;gap:14px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.grp.open .bts{display:grid}
+
+.bt{background:var(--bg-2);border:1px solid var(--border);border-radius:7px;overflow:hidden;display:flex;flex-direction:column}
+.bt.best{border-color:var(--cyan-30)}
+.bt-head{padding:11px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.bt-hash{font:600 11px var(--mono);color:var(--cyan)}
+.bt-prompt{font:400 11px var(--mono);color:var(--tx-2);margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+.bt-tag{font:600 9px var(--mono);padding:2px 6px;border-radius:8px}
+.bt-tag.best{background:var(--cyan-15);color:var(--cyan)}
+.bt-tag.lib{background:var(--amber-15);color:var(--amber)}
+.bt-head .spacer{flex:1}
+.bt-score{font:600 13px var(--mono)}
+.bt-score.hi{color:var(--green)}.bt-score.mid{color:var(--amber)}.bt-score.lo{color:var(--red)}
+.bt-sub{display:flex;gap:12px;padding:9px 13px;border-bottom:1px solid var(--border);font:500 10px var(--mono);color:var(--tx-2)}
+.bt-sub b{color:var(--tx-1)}
+
+.acts{padding:9px 13px;display:flex;flex-direction:column;gap:0}
+.acts-lbl{font:600 10px var(--mono);color:var(--tx-3);margin-bottom:6px}
+.act{display:flex;align-items:center;gap:8px;padding:4px 0;font:500 11px var(--mono);border-bottom:1px solid rgba(28,38,54,.5)}
+.act:last-child{border-bottom:0}
+.act .ic{width:14px;height:14px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+.act .ic.ok{background:var(--green-15);color:var(--green)}
+.act .ic.no{background:var(--red-15);color:var(--red)}
+.act .name{color:var(--tx-1);min-width:108px}
+.act .msg{color:var(--tx-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act .dur{color:var(--tx-2);flex:none}
+
+.runs{border-top:1px solid var(--border);padding:9px 13px}
+.runs-toggle{font:600 10px var(--mono);color:var(--tx-2);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.runs-toggle:hover{color:var(--cyan)}
+.runs-body{display:none;margin-top:8px;flex-direction:column;gap:3px}
+.runs.open .runs-body{display:flex}
+.run{display:flex;align-items:center;gap:8px;font:500 10px var(--mono);color:var(--tx-2);cursor:pointer;padding:2px 0}
+.run:hover{color:var(--tx-1)}
+.run.sel{color:var(--cyan)}
+.run .ic{width:12px;height:12px;border-radius:50%;flex:none}
+.run .ic.ok{background:var(--green)}.run .ic.no{background:var(--red)}
+.run .ts{flex:1}
+
+.empty,.err{text-align:center;color:var(--tx-2);padding:60px 20px;font:500 13px var(--mono)}
+.err{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">
+    <b>SPARK</b><span class="sep"></span>
+    <span>BT EXECUTION SCORES</span>
+  </div>
+  <div class="right">
+    <div class="summary" id="summary"></div>
+    <a href="/"><- control</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <p class="intro">
+    Task-execution scores grouped by category (every silverware phrasing
+    scores together; each BT keeps the prompt it ran under). For every task
+    the Gemini planner may emit different behaviour trees across runs; each
+    distinct BT is shown with its execution outcome: success rate over runs,
+    per-action pass/fail from the latest run, and durations. Operator-aborted
+    runs are excluded from scoring.
+  </p>
+  <div class="controls">
+    <input id="search" type="text" placeholder="filter instructions..." autocomplete="off">
+    <label><input id="multi-only" type="checkbox"> only tasks with multiple BTs</label>
+    <label><input id="ok-only" type="checkbox"> only BTs that ever succeeded</label>
+  </div>
+  <div id="content"><div class="empty">loading...</div></div>
+</div>
+
+<script>
+let DATA = null;
+const fmtPct = r => Math.round((r||0)*100) + '%';
+const rateClass = r => r >= 0.66 ? 'hi' : (r >= 0.34 ? 'mid' : 'lo');
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load(){
+  try{
+    const r = await fetch('/api/bt/scores');
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    DATA = await r.json();
+    if(DATA.error) throw new Error(DATA.error);
+    renderSummary();
+    render();
+  }catch(e){
+    document.getElementById('content').innerHTML =
+      '<div class="err">failed to load scores: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderSummary(){
+  const t = DATA.totals || {};
+  document.getElementById('summary').innerHTML =
+    metric(t.categories, 'categories') +
+    metric(t.distinct_bts, 'distinct BTs') +
+    metric(t.runs, 'runs');
+}
+function metric(v, lbl){
+  return '<div class="m"><b>' + (v==null?'-':v) + '</b><small>' + lbl + '</small></div>';
+}
+
+// The rendered view: categories with their BTs already filtered. Both the
+// renderer and the click handlers index into this one array, so the filter
+// toggles can never desync the DOM ids from the data.
+let VIEW = [];
+
+function computeView(){
+  const q = (document.getElementById('search').value||'').trim().toLowerCase();
+  const multiOnly = document.getElementById('multi-only').checked;
+  const okOnly = document.getElementById('ok-only').checked;
+  let cats = (DATA.categories||[]);
+  if(q) cats = cats.filter(c =>
+    c.category.toLowerCase().includes(q) ||
+    c.bts.some(b => (b.instruction||'').toLowerCase().includes(q)));
+  let view = cats.map(c => Object.assign({}, c, {
+    bts: okOnly ? c.bts.filter(b => b.n_success > 0) : c.bts,
+  })).filter(c => c.bts.length);
+  if(multiOnly) view = view.filter(c => c.bts.length >= 2);
+  return view;
+}
+
+function render(){
+  VIEW = computeView();
+  const el = document.getElementById('content');
+  if(!VIEW.length){ el.innerHTML = '<div class="empty">no task runs match.</div>'; return; }
+  el.innerHTML = VIEW.map((c, gi) => groupHtml(c, gi)).join('');
+}
+
+function groupHtml(g, gi){
+  const open = gi === 0 ? ' open' : '';
+  const rc = rateClass(g.success_rate);
+  const prompts = g.n_prompts > 1
+    ? '<span class="pill bts">' + g.n_prompts + ' prompts</span>' : '';
+  return ''
+    + '<div class="grp' + open + '" data-gi="' + gi + '">'
+    +   '<div class="grp-head" onclick="toggleGroup(this)">'
+    +     '<span class="grp-caret">▶</span>'
+    +     '<span class="grp-title">' + esc(g.category) + '</span>'
+    +     '<span class="grp-meta">'
+    +       prompts
+    +       '<span class="pill bts">' + g.bts.length + ' BT' + (g.bts.length>1?'s':'') + '</span>'
+    +       '<span class="bar"><i style="width:' + fmtPct(g.success_rate) + '"></i></span>'
+    +       '<span class="pill rate ' + rc + '">' + g.n_success + '/' + g.n_runs + ', ' + fmtPct(g.success_rate) + '</span>'
+    +     '</span>'
+    +   '</div>'
+    +   '<div class="bts">' + g.bts.map((b, bi) => btHtml(b, gi, bi)).join('') + '</div>'
+    + '</div>';
+}
+
+function btHtml(b, gi, bi){
+  const rc = rateClass(b.success_rate);
+  const best = bi === 0 && b.n_success > 0;
+  const tags =
+    (best ? '<span class="bt-tag best">best</span>' : '') +
+    (b.in_library ? '<span class="bt-tag lib">library</span>' : '');
+  const prompt = b.instruction
+    ? '<span class="bt-prompt" title="' + esc((b.prompts||[]).join('\n')) + '">'
+      + esc(b.instruction) + (b.prompts && b.prompts.length > 1
+        ? ' (+' + (b.prompts.length-1) + ')' : '') + '</span>'
+    : '';
+  return ''
+    + '<div class="bt' + (best?' best':'') + '" id="bt-' + gi + '-' + bi + '">'
+    +   '<div class="bt-head">'
+    +     '<span class="bt-hash">' + esc(b.hash) + '</span>' + prompt + tags
+    +     '<span class="spacer"></span>'
+    +     '<span class="bt-score ' + rc + '">' + b.n_success + '/' + b.n_runs + '</span>'
+    +   '</div>'
+    +   '<div class="bt-sub">'
+    +     '<span><b>' + b.n_actions + '</b> actions</span>'
+    +     '<span>rate <b>' + fmtPct(b.success_rate) + '</b></span>'
+    +     (b.n_unverified
+        ? '<span title="runs the verifier could not judge; they neither '
+          + 'reinforce nor penalise this tree">unverified <b>'
+          + b.n_unverified + '/' + b.n_runs + '</b></span>'
+        : '')
+    +     '<span>latest <b>' + b.latest.duration.toFixed(0) + 's</b></span>'
+    +     verifyHtml(b.latest.verify)
+    +   '</div>'
+    +   actsHtml(b.latest)
+    +   runsHtml(b, gi, bi)
+    + '</div>';
+}
+
+// Tri-state. "unverified" is NOT a quieter failure and must not render as a
+// blank: it means nobody could check the run, and a tree whose runs are mostly
+// unverified is a verifier blind spot, not a broken tree.
+function verifyHtml(v){
+  if(v === 'pass' || v === true)  return '<span style="color:var(--green)">verify pass</span>';
+  if(v === 'fail' || v === false) return '<span style="color:var(--red)">verify FAIL</span>';
+  if(v === 'unverified') return '<span style="color:var(--amber,#c90)" '
+    + 'title="executed, but no camera could judge the goal predicate. '
+    + 'Neither reinforces nor penalises the cached tree.">unverified</span>';
+  return '';
+}
+
+function actsHtml(run){
+  const acts = (run && run.actions) || [];
+  if(!acts.length) return '<div class="acts"><div class="acts-lbl">latest run: no actions</div></div>';
+  const rows = acts.map(a => ''
+    + '<div class="act">'
+    +   '<span class="ic ' + (a.success?'ok':'no') + '">' + (a.success?'ok':'x') + '</span>'
+    +   '<span class="name">' + esc(a.action) + '</span>'
+    +   '<span class="msg" title="' + esc(a.message) + '">' + esc(a.message) + '</span>'
+    +   '<span class="dur">' + (a.duration||0).toFixed(1) + 's</span>'
+    + '</div>'
+  ).join('');
+  return '<div class="acts" data-acts="' + run.timestamp + '">'
+    + '<div class="acts-lbl">latest run, ' + esc(run.timestamp) + '</div>'
+    + rows + '</div>';
+}
+
+function runsHtml(b, gi, bi){
+  if(b.n_runs <= 1) return '';
+  const rows = b.runs.map((r, ri) => ''
+    + '<div class="run' + (ri===0?' sel':'') + '" onclick="selectRun(' + gi + ',' + bi + ',' + ri + ')">'
+    +   '<span class="ic ' + (r.success?'ok':'no') + '"></span>'
+    +   '<span class="ts">' + esc(r.timestamp) + '</span>'
+    +   '<span>' + (r.duration||0).toFixed(0) + 's</span>'
+    + '</div>'
+  ).join('');
+  return '<div class="runs" id="runs-' + gi + '-' + bi + '">'
+    + '<div class="runs-toggle" onclick="toggleRuns(' + gi + ',' + bi + ')">'
+    +   '<span class="rc">▶</span> ' + b.n_runs + ' runs of this BT</div>'
+    + '<div class="runs-body">' + rows + '</div></div>';
+}
+
+function toggleGroup(head){ head.parentElement.classList.toggle('open'); }
+function toggleRuns(gi, bi){
+  const el = document.getElementById('runs-' + gi + '-' + bi);
+  el.classList.toggle('open');
+  const rc = el.querySelector('.rc');
+  if(rc) rc.textContent = el.classList.contains('open') ? '▼' : '▶';
+}
+function selectRun(gi, bi, ri){
+  // VIEW is exactly what was rendered, so the ids always resolve.
+  const bt = VIEW[gi] && VIEW[gi].bts[bi]; if(!bt) return;
+  const run = bt.runs[ri]; if(!run) return;
+  const card = document.getElementById('bt-' + gi + '-' + bi);
+  if(!card) return;
+  const acts = card.querySelector('.acts');
+  if(acts) acts.outerHTML = actsHtml(run);
+  card.querySelectorAll('.runs .run').forEach((n, i) => n.classList.toggle('sel', i===ri));
+}
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('multi-only').addEventListener('change', render);
+document.getElementById('ok-only').addEventListener('change', render);
+load();
+</script>
+</body>
+</html>

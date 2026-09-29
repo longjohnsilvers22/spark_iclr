@@ -1,0 +1,35 @@
+# B1: Bimanual sponge handover + cylindrical scrub
+# Left arm grips the sponge by its width (good for flat surfaces);
+# handoff to right arm which re-grips along the length (good for
+# wrapping around the glass). Differentiator: zero papers do re-grip
+# via handoff to switch grasp mode mid-task.
+task: wash the inside of the glass with the sponge using both arms
+tree:
+  type: sequence
+  children:
+    - type: bimanual_handover_sponge
+      params:
+        sponge_label: "sponge"
+        width_grip: 0.028
+        length_grip: 0.018
+        force: 12
+        meeting_point: [0.0, 0.0, 0.32]
+    - type: parallel
+      children:
+        - type: hold_in_place
+          params: {arm: left, dwell: 6.0}
+        - type: sequence
+          children:
+            - type: move_to_keypoint_arm
+              params: {arm: right, keypoint_label: "glass", offset_z: 0.04}
+            - type: constrained_scrub
+              params:
+                arm: right
+                workpiece_label: "glass"
+                duration: 5.0
+                amplitude: 0.012
+                frequency: 1.2
+                normal_force: 5.0
+                axis: "yz"
+    - type: place_with_arm
+      params: {arm: right, tilt_angle: 0}

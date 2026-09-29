@@ -1,0 +1,30 @@
+# Constrained scrub task -- UR10e + Robotiq 2F-85
+# Grasp sponge and scrub inside the bowl.
+# Uses legacy UR10e primitives (move_to_keypoint + grasp).
+task: scrub the bowl with the sponge
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "sponge"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "sponge"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 40
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.08}
+    - type: constrained_scrub
+      params:
+        target_label: "bowl"
+        n_passes: 4
+        force: 5.0
+        radius_m: 0.04
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}
+    - type: release
+      params: {}

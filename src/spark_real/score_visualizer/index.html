@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SPARK Score</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#fff;overflow:hidden;font-family:Inter,system-ui,sans-serif}
+#container{width:100%;height:100%}
+#score-select{
+  position:fixed;top:12px;right:12px;z-index:10;
+  padding:4px 8px;border:1px solid #ccc;border-radius:4px;
+  font-size:11px;font-family:Inter,sans-serif;background:rgba(255,255,255,0.9);
+  color:#333;cursor:pointer;outline:none;
+}
+</style>
+</head>
+<body>
+<div id="container"></div>
+<div id="tooltip" style="
+  position:fixed;display:none;z-index:20;
+  background:#fff;border:1px solid #ccc;border-radius:6px;
+  padding:10px 14px;font-size:11px;color:#333;
+  box-shadow:0 4px 16px rgba(0,0,0,0.1);
+  font-family:'JetBrains Mono',monospace;line-height:1.6;
+  pointer-events:none;max-width:260px;
+"></div>
+<select id="score-select">
+  <option value="mug_pour">Mug Pour - 6 notes, legato phrase</option>
+  <option value="sponge_soap">Sponge Wash - 6 notes, legato phrase</option>
+  <option value="sweep_cubes">Sweep Cubes - 5 notes</option>
+  <option value="bimanual_fold">Bimanual T-shirt Fold - grand staff</option>
+  <option value="cup_pour_stepwise">Cup Pour stepwise - 10 notes</option>
+  <option value="bimanual_dustpan">Bimanual Sweep - grand staff</option>
+  <option value="fold">Fold Cloth - 3 notes, pp</option>
+  <option value="dustpan_prod">Dustpan - 2 notes</option>
+</select>
+
+<script type="importmap">
+{"imports":{"three":"./three.module.js"}}
+</script>
+
+<script type="module">
+window.onerror = (msg,src,line,col,err) => {
+  document.body.innerHTML = `<pre style="padding:20px;color:red">${msg}\n${src}:${line}:${col}\n${err?.stack||''}</pre>`;
+};
+import * as THREE from 'three';
+import {OrbitControls} from './OrbitControls.js';
+
+// ─── ROLLOUT FRAMES ──────────────────────────────────────────────────
+// Rollout frames served via symlink: score_visualizer/rollouts -> ../rollouts
+
+function showFrameInTooltip(tooltipEl, scoreKey, noteIdx){
+  const score=SCORES[scoreKey];
+  if(!score||!score.rollout)return;
+  const phase=score.notePhase?score.notePhase[noteIdx]:null;
+  if(!phase)return;
+  // bimanual uses 'external' camera, single-arm uses 'birdview'
+  const cam=score.bimanual?'external':'birdview';
+  const src=`rollouts/${score.rollout}/keyframe_${phase}_${cam}.png`;
+  const existing=tooltipEl.querySelector('.frame-img');
+  if(existing){existing.src=src;existing.style.display='block'}
+  else{
+    const img=document.createElement('img');
+    img.className='frame-img';
+    img.src=src;
+    img.style.cssText='width:100%;border-radius:4px;margin-bottom:8px;display:block';
+    img.onerror=()=>{img.style.display='none'};
+    tooltipEl.prepend(img);
+  }
+}
+
+// ─── SCORE DATA ──────────────────────────────────────────────────────
+const SCORES = {
+  // ── Real Gemini-generated BTs from rollout bt_plan.yaml ──
+  sponge_soap:{
+    name:"Sponge Wash",
+    rollout:"sponge_wash/20260526_170353",
+    notePhase:["grasp_sponge","grasp_sponge","scrub_start","scrub_done","place_sponge","end"],
+    phases:[
+      {label:"Grasp",start:0,end:0},
+      {label:"Lift",start:1,end:1},
+      {label:"Scrub",start:2,end:2},
+      {label:"Retract",start:3,end:3},
+      {label:"Return + Place",start:4,end:5}
+    ],
+    // Legato: notes 3,4 (move_relative + move_to_keypoint while holding)
+    notes:[
+      {type:"grasp_se3",label:"sponge",params:{strategy:"top_down",force:25,target_width:0.035}},
+      {type:"move_relative",label:"lift",params:{dz:0.1}},
+      {type:"constrained_scrub",label:"plate",params:{force_n:8.0,n_cycles:4,scrub_radius_m:0.04,pattern:"circle"}},
+      {type:"move_relative",label:"retract",params:{dz:0.1}},
+      {type:"move_to_keypoint",label:"sponge",params:{offset_z:0.02}},
+      {type:"release",label:"",params:{}}
+    ]
+  },
+  mug_pour:{
+    name:"Mug Pour",
+    rollout:"mug_pour/20260526_163117",
+    notePhase:["grasp","grasp","pour","pour","place","place","end"],
+    phases:[
+      {label:"Grasp",start:0,end:0},
+      {label:"Lift",start:1,end:1},
+      {label:"Pour",start:2,end:2},
+      {label:"Return + Place",start:3,end:5}
+    ],
+    // Legato: notes 3,4 (move_to_keypoint + move_relative while holding)
+    notes:[
+      {type:"grasp_se3",label:"mug handle",params:{force:60,target_width:0.03}},
+      {type:"move_relative",label:"lift",params:{dz:0.15}},
+      {type:"pour",label:"bowl",params:{source_label:"mug",target_label:"bowl",pour_angle_rad:1.4,target_fill_fraction:0.7,max_pour_s:10.0}},
+      {type:"move_to_keypoint",label:"mug",params:{offset_z:0.06}},
+      {type:"move_relative",label:"descend",params:{dz:-0.04}},
+      {type:"release",label:"",params:{}}
+    ]
+  },
+  sweep_cubes:{
+    name:"Sweep Cubes",
+    rollout:"sweep_cubes/20260526_164718",
+    notePhase:["grasp","lift","sweep_start","sweep_done","end"],
+    phases:[
+      {label:"Grasp",start:0,end:0},
+      {label:"Lift",start:1,end:1},
+      {label:"Sweep",start:2,end:2},
+      {label:"Return + Place",start:3,end:4}
+    ],
+    notes:[
+      {type:"grasp_se3",label:"brush",params:{strategy:"top_down",force:60,target_width:0.02}},
+      {type:"move_relative",label:"lift",params:{dz:0.1}},
+      {type:"sweep",label:"cubes -> dustpan",params:{object_labels:"orange cube, green cube",target_label:"black dustpan",n_passes:2,sweep_height_m:0.04}},
+      {type:"move_to_keypoint",label:"brush",params:{offset_z:0.02}},
+      {type:"release",label:"",params:{}}
+    ]
+  },
+  fold:{
+    name:"Fold Cloth",
+    notes:[
+      {type:"grasp_se3",label:"corner",params:{force:15}},
+      {type:"move_to_keypoint",label:"fold line",params:{offset_z:0.08}},
+      {type:"release",label:"",params:{}}
+    ]
+  },
+  cup_pour_stepwise:{
+    name:"Cup Pour",
+    notes:[
+      {type:"move_to_keypoint",label:"cup",params:{offset_z:0.10}},
+      {type:"tilt_wrist",label:"orient",params:{}},
+      {type:"move_relative",label:"descend",params:{dz:-0.07}},
+      {type:"grasp",label:"cup",params:{force:50}},
+      {type:"move_relative",label:"lift",params:{dz:0.15}},
+      {type:"move_to_keypoint",label:"bowl",params:{offset_z:0.10}},
+      {type:"tilt_wrist",label:"pour",params:{}},
+      {type:"wait",label:"hold",params:{duration:2}},
+      {type:"tilt_wrist",label:"upright",params:{}},
+      {type:"release",label:"",params:{}}
+    ]
+  },
+  bimanual_fold:{
+    name:"Bimanual T-shirt Fold",
+    bimanual:true,
+    rollout:"bimanual_fold",
+    notePhase:["homed","homed","homed","homed","at_hem","at_hem","hem_folded","hem_folded","complete","complete"],
+    phases:[
+      {label:"Pinch Sleeves",start:0,end:1},
+      {label:"Fold Sleeves",start:2,end:3},
+      {label:"Pinch Hem",start:4,end:5},
+      {label:"Fold to Collar",start:6,end:7},
+      {label:"Release",start:8,end:9}
+    ],
+    notes:[
+      {type:"pick_with_arm",label:"left sleeve",params:{force:20},arm:"left"},
+      {type:"pick_with_arm",label:"right sleeve",params:{force:20},arm:"right"},
+      {type:"fold_arch",label:"fold inward",params:{force:15},arm:"left"},
+      {type:"fold_arch",label:"fold inward",params:{force:15},arm:"right"},
+      {type:"pick_with_arm",label:"hem left",params:{force:20},arm:"left"},
+      {type:"pick_with_arm",label:"hem right",params:{force:20},arm:"right"},
+      {type:"fold_arch",label:"fold to collar",params:{force:15},arm:"left"},
+      {type:"fold_arch",label:"fold to collar",params:{force:15},arm:"right"},
+      {type:"release_arm",label:"",params:{},arm:"left"},
+      {type:"release_arm",label:"",params:{},arm:"right"}
+    ],
+    parallel_groups:[[0,1],[2,3],[4,5],[6,7],[8,9]]
+  },
+  bimanual_dustpan:{
+    name:"Bimanual Sweep",
+    bimanual:true,
+    notes:[
+      {type:"pick_with_arm",label:"dustpan",params:{force:60},arm:"left"},
+      {type:"pick_with_arm",label:"brush",params:{force:60},arm:"right"},
+      {type:"hold_in_place",label:"anchor",params:{force:40,dwell:15},arm:"left"},
+      {type:"sweep",label:"sweep",params:{force:30,n_passes:3},arm:"right"},
+      {type:"release_arm",label:"",params:{},arm:"left"},
+      {type:"release_arm",label:"",params:{},arm:"right"}
+    ],
+    parallel_groups:[[0,1],[2,3],[4,5]]
+  },
+  dustpan_prod:{
+    name:"Dustpan",
+    notes:[
+      {type:"grasp_se3",label:"brush",params:{force:60}},
+      {type:"sweep_to_container",label:"dustpan",params:{force:30,max_passes:4}}
+    ]
+  }
+};
+
+// ─── MUSIC MAPPINGS ──────────────────────────────────────────────────
+const GRASP=new Set(['grasp_se3','grasp','pick_with_arm']);
+const MOVE=new Set(['move_to_keypoint','move_relative','tilt_wrist']);
+const REL=new Set(['release','release_arm']);
+const LEGATO=new Set(['move_relative','move_to_keypoint']);
+const SUST=new Set(['pour','sweep','sweep_to_container','constrained_scrub','hold_in_place','wait','fold_arch']);
+
+const CAT_COL={grasp:0x2563eb,move:0x059669,manipulate:0xd97706,release:0xdc2626};
+const CAT_HEX={grasp:'#2563eb',move:'#059669',manipulate:'#d97706',release:'#dc2626'};
+
+function cat(t){return GRASP.has(t)?'grasp':MOVE.has(t)?'move':REL.has(t)?'release':'manipulate'}
+function lane(t){return GRASP.has(t)?1:MOVE.has(t)?2:REL.has(t)?4:3}
+function dyn(p){const f=p.force||p.force_n||0;return f<=0?'':f<=15?'pp':f<=30?'p':f<=50?'mp':f<=60?'mf':f<=80?'f':'ff'}
+function noteVal(t,p){
+  if(SUST.has(t)){const d=p.max_pour_s||p.dwell||p.duration||((p.n_passes||1)*2)||3;return d>4?'whole':'half'}
+  if(GRASP.has(t))return'half';
+  if(t==='move_to_keypoint')return'quarter';
+  if(MOVE.has(t))return'eighth';
+  if(REL.has(t))return'eighth';
+  return'quarter';
+}
+
+function analyzeLegato(notes){
+  const ph=[];let hold=false,cur=[];
+  for(let i=0;i<notes.length;i++){
+    const t=notes[i].type;
+    if(GRASP.has(t))hold=true;
+    if(REL.has(t))hold=false;
+    if(LEGATO.has(t)&&(t!=='move_to_keypoint'||hold)){cur.push(i)}
+    else{if(cur.length>=2)ph.push([...cur]);cur=[]}
+  }
+  if(cur.length>=2)ph.push([...cur]);
+  return ph;
+}
+
+// ─── THREE.JS ────────────────────────────────────────────────────────
+const container=document.getElementById('container');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xffffff);
+
+const camera=new THREE.PerspectiveCamera(34,1,0.1,100);
+camera.position.set(0, 5.5, 13);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.toneMapping=THREE.NoToneMapping;
+container.appendChild(renderer.domElement);
+
+const ctrl=new OrbitControls(camera,renderer.domElement);
+ctrl.enableDamping=true;ctrl.dampingFactor=0.06;
+ctrl.target.set(0,0,0);ctrl.update();
+
+scene.add(new THREE.AmbientLight(0xffffff,1.2));
+const dl=new THREE.DirectionalLight(0xffffff,0.5);
+dl.position.set(3,8,6);scene.add(dl);
+
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+let staffG=new THREE.Group(),noteG=new THREE.Group(),annoG=new THREE.Group();
+scene.add(staffG,noteG,annoG);
+let meshes=[],meshMap=new Map(),selMesh=null,curScore=null;
+
+// ─── SINE WAVE STAFF ─────────────────────────────────────────────────
+const W=16, AMP=2.0, PERIODS=1.5;
+const SL=5, LG=0.42, LR=0.025;
+
+function cPos(t,line,staveY){
+  staveY=staveY||0;
+  const x=(t-0.5)*W;
+  const y=(line-(SL-1)/2)*LG + staveY;
+  const z=AMP*Math.sin(t*Math.PI*2*PERIODS);
+  return new THREE.Vector3(x,y,z);
+}
+
+function cNorm(t){
+  const dt=0.001;
+  const a=cPos(Math.max(0,t-dt),2), b=cPos(Math.min(1,t+dt),2);
+  const tg=new THREE.Vector3().subVectors(b,a).normalize();
+  const n=new THREE.Vector3(-tg.z,0,tg.x).normalize();
+  if(n.z<0)n.negate();
+  return n;
+}
+
+function orientGroup(group, tNorm){
+  const tg_dt=0.001;
+  const a=cPos(Math.max(0,tNorm-tg_dt),2), b=cPos(Math.min(1,tNorm+tg_dt),2);
+  const tangent=new THREE.Vector3().subVectors(b,a).normalize();
+  const up=new THREE.Vector3(0,1,0);
+  const normal=new THREE.Vector3().crossVectors(tangent,up).normalize();
+  if(normal.z<0)normal.negate();
+  const right=new THREE.Vector3().crossVectors(up,normal).normalize();
+  group.setRotationFromMatrix(new THREE.Matrix4().makeBasis(right,up,normal));
+}
+
+function drawStaff(staveY){
+  const mat=new THREE.MeshBasicMaterial({color:0x1a1a1a});
+  for(let l=0;l<SL;l++){
+    const pts=[];
+    for(let i=0;i<=140;i++)pts.push(cPos(i/140,l,staveY));
+    const curve=new THREE.CatmullRomCurve3(pts);
+    staffG.add(new THREE.Mesh(new THREE.TubeGeometry(curve,140,LR,8,false),mat));
+  }
+}
+
+function drawBarline(t,thick,staveY,spanBoth){
+  const mat=new THREE.MeshBasicMaterial({color:0x1a1a1a});
+  const topLine = spanBoth ? SL-1 : SL-1;
+  const botLine = 0;
+  const topStave = spanBoth ? (staveY||0) + 1.2 : (staveY||0);
+  const botStave = spanBoth ? (staveY||0) - 1.2 : (staveY||0);
+  const top=cPos(t,topLine,topStave);
+  const bot=cPos(t,botLine,botStave);
+  top.y+=LG*0.2; bot.y-=LG*0.2;
+  const curve=new THREE.LineCurve3(bot,top);
+  const r=thick?0.024:0.014;
+  staffG.add(new THREE.Mesh(new THREE.TubeGeometry(curve,2,r,6,false),mat));
+}
+
+function drawDoubleBar(t,staveY,spanBoth){
+  const n=cNorm(t);
+  const g=new THREE.Group();
+  // Thin bar
+  drawBarline(t,false,staveY,spanBoth);
+  // We need a second bar offset along the normal - approximate by small t shift
+  const t2 = Math.min(1, t + 0.012);
+  drawBarline(t2,true,staveY,spanBoth);
+}
+
+// ─── TREBLE CLEF (hand-drawn, right-side up) ─────────────────────────
+function drawClef(ctx,cx,cy,s){
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.scale(s,-s); // flip Y so clef is right-side up
+  ctx.strokeStyle='#1a1a1a';ctx.fillStyle='#1a1a1a';
+  ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';
+
+  // Main spiral body
+  ctx.beginPath();
+  ctx.moveTo(4,50);
+  ctx.bezierCurveTo(-8,44,-14,30,-6,18);
+  ctx.bezierCurveTo(2,6,14,8,12,20);
+  ctx.bezierCurveTo(10,32,-4,36,-10,24);
+  ctx.bezierCurveTo(-16,12,-4,-4,4,-12);
+  ctx.bezierCurveTo(12,-20,8,-32,-2,-28);
+  ctx.stroke();
+
+  // Vertical stem
+  ctx.lineWidth=3.5;
+  ctx.beginPath();
+  ctx.moveTo(4,-32);ctx.lineTo(4,54);
+  ctx.stroke();
+
+  // Bottom curl + dot
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(4,54);
+  ctx.bezierCurveTo(-4,58,-8,52,-2,48);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(-2,48,3.5,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function clefSprite(t,staveY){
+  const c=document.createElement('canvas');
+  c.width=128;c.height=320;
+  drawClef(c.getContext('2d'),64,160,1.8);
+  const tex=new THREE.CanvasTexture(c);
+  tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  const p=cPos(t,2,staveY);
+  sp.position.copy(p);
+  sp.position.add(cNorm(t).multiplyScalar(0.15));
+  sp.scale.set(1.2,3.0,1);
+  return sp;
+}
+
+// Bass clef for lower staff
+function drawBassClef(ctx,cx,cy,s){
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.scale(s,-s);
+  ctx.strokeStyle='#1a1a1a';ctx.fillStyle='#1a1a1a';
+  ctx.lineWidth=4;ctx.lineCap='round';
+
+  ctx.beginPath();
+  ctx.arc(0,0,14,Math.PI*0.15,Math.PI*1.5,false);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(0,-14);ctx.lineTo(0,18);
+  ctx.stroke();
+
+  // Two dots
+  ctx.beginPath();ctx.arc(18,-6,3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(18,6,3,0,Math.PI*2);ctx.fill();
+
+  ctx.restore();
+}
+
+function bassClefSprite(t,staveY){
+  const c=document.createElement('canvas');
+  c.width=128;c.height=200;
+  drawBassClef(c.getContext('2d'),50,100,1.6);
+  const tex=new THREE.CanvasTexture(c);
+  tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  const p=cPos(t,2,staveY);
+  sp.position.copy(p);
+  sp.position.add(cNorm(t).multiplyScalar(0.15));
+  sp.scale.set(1.0,1.6,1);
+  return sp;
+}
+
+// Grand staff brace {
+function braceSprite(t,topY,botY){
+  const c=document.createElement('canvas');
+  c.width=64;c.height=400;
+  const ctx=c.getContext('2d');
+  ctx.strokeStyle='#1a1a1a';ctx.lineWidth=4;ctx.lineCap='round';
+  const h=380,mid=200;
+  ctx.beginPath();
+  ctx.moveTo(40,10);
+  ctx.bezierCurveTo(20,10,16,mid-30,10,mid);
+  ctx.bezierCurveTo(16,mid+30,20,h-10,40,h);
+  ctx.stroke();
+  // center point
+  ctx.beginPath();ctx.moveTo(10,mid);ctx.lineTo(4,mid);ctx.stroke();
+
+  const tex=new THREE.CanvasTexture(c);
+  tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  const p=cPos(t,2,(topY+botY)/2);
+  sp.position.copy(p);
+  sp.position.x -= 0.6;
+  sp.position.add(cNorm(t).multiplyScalar(0.2));
+  sp.scale.set(0.5, (topY-botY)+SL*LG+0.5, 1);
+  return sp;
+}
+
+// ─── TIME SIGNATURE ──────────────────────────────────────────────────
+function timeSigSprite(t,staveY){
+  const c=document.createElement('canvas');
+  c.width=80;c.height=160;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#1a1a1a';ctx.font='bold 58px Inter,sans-serif';ctx.textAlign='center';
+  ctx.fillText('4',40,55);ctx.fillText('4',40,115);
+  const tex=new THREE.CanvasTexture(c);tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  const p=cPos(t,2,staveY);
+  sp.position.copy(p);sp.position.add(cNorm(t).multiplyScalar(0.15));
+  sp.scale.set(0.5,1.0,1);
+  return sp;
+}
+
+// ─── NOTE CREATION ───────────────────────────────────────────────────
+function makeNote(nd,tNorm,staffLine,idx,isLeg,staveY){
+  const c=cat(nd.type),color=CAT_COL[c];
+  const nv=noteVal(nd.type,nd.params);
+  const isOpen=nv==='whole'||nv==='half';
+  const group=new THREE.Group();
+  const pos=cPos(tNorm,staffLine,staveY);
+
+  const hw=0.20,hh=0.15,hd=0.08;
+  let hitMesh;
+
+  if(isOpen){
+    // Open note: colored ellipsoid with white center (ring effect)
+    const outerG=new THREE.SphereGeometry(1,16,12);
+    outerG.scale(hw,hh,hd);
+    const outerM=new THREE.MeshStandardMaterial({color,metalness:0.05,roughness:0.7});
+    const outer=new THREE.Mesh(outerG,outerM);
+    outer.rotation.z=-0.25;
+    group.add(outer);
+
+    const innerG=new THREE.SphereGeometry(1,16,12);
+    innerG.scale(hw*0.52,hh*0.52,hd*1.3);
+    const innerM=new THREE.MeshBasicMaterial({color:0xffffff});
+    const inner=new THREE.Mesh(innerG,innerM);
+    inner.rotation.z=-0.25;
+    group.add(inner);
+
+    hitMesh=outer;
+  } else {
+    // Filled note
+    const g=new THREE.SphereGeometry(1,16,12);
+    g.scale(hw,hh,hd);
+    const m=new THREE.MeshStandardMaterial({color,metalness:0.05,roughness:0.7});
+    const h=new THREE.Mesh(g,m);
+    h.rotation.z=-0.25;
+    group.add(h);
+    hitMesh=h;
+  }
+
+  // Stem
+  if(nv!=='whole'){
+    const stemH=0.7, stemDir=staffLine>=2.5?-1:1;
+    const sg=new THREE.CylinderGeometry(0.014,0.014,stemH,4);
+    const sm=new THREE.MeshBasicMaterial({color:0x222222});
+    const st=new THREE.Mesh(sg,sm);
+    st.position.set(hw*0.7,stemDir*stemH/2,0);
+    group.add(st);
+
+    if(nv==='eighth'){
+      const fc=document.createElement('canvas');fc.width=48;fc.height=80;
+      const fx=fc.getContext('2d');
+      fx.strokeStyle='#222';fx.lineWidth=3;fx.lineCap='round';
+      fx.beginPath();
+      if(stemDir>0){fx.moveTo(8,4);fx.quadraticCurveTo(36,20,24,50)}
+      else{fx.moveTo(8,76);fx.quadraticCurveTo(36,60,24,30)}
+      fx.stroke();
+      const ft=new THREE.CanvasTexture(fc);
+      const fs=new THREE.Sprite(new THREE.SpriteMaterial({map:ft,transparent:true,depthTest:false}));
+      fs.position.set(hw*0.7+0.1,stemDir*(stemH*0.85),0);
+      fs.scale.set(0.22,0.36,1);
+      group.add(fs);
+    }
+  }
+
+  // Staccato dot
+  if(!isLeg&&!SUST.has(nd.type)){
+    const dg=new THREE.SphereGeometry(0.035,8,6);
+    const dm=new THREE.MeshBasicMaterial({color:0x333333});
+    const d=new THREE.Mesh(dg,dm);
+    d.position.set(0,staffLine>=2.5?0.28:-0.28,0);
+    group.add(d);
+  }
+
+  // Accent on grasps
+  if(GRASP.has(nd.type)){
+    const ac=document.createElement('canvas');ac.width=40;ac.height=28;
+    const ax=ac.getContext('2d');
+    ax.strokeStyle='#333';ax.lineWidth=3;ax.lineCap='round';ax.lineJoin='round';
+    ax.beginPath();ax.moveTo(6,22);ax.lineTo(20,6);ax.lineTo(34,22);ax.stroke();
+    const at=new THREE.CanvasTexture(ac);
+    const as2=new THREE.Sprite(new THREE.SpriteMaterial({map:at,transparent:true,depthTest:false}));
+    as2.position.set(0,staffLine>=2.5?-0.34:0.34,0);
+    as2.scale.set(0.22,0.15,1);
+    group.add(as2);
+  }
+
+  // Invisible hit sphere (much larger for easy clicking)
+  const hitGeo=new THREE.SphereGeometry(0.35,8,6);
+  const hitMat2=new THREE.MeshBasicMaterial({visible:false,transparent:true,opacity:0});
+  const hitSphere=new THREE.Mesh(hitGeo,hitMat2);
+  group.add(hitSphere);
+
+  // Position + orient
+  group.position.copy(pos);
+  group.position.add(cNorm(tNorm).multiplyScalar(0.06));
+  orientGroup(group,tNorm);
+
+  hitSphere.userData={noteIndex:idx,group,visualMesh:hitMesh};
+  meshMap.set(hitSphere,{data:nd,index:idx,group,isLeg,visualMesh:hitMesh});
+  meshes.push(hitSphere);
+  return group;
+}
+
+// ─── ANNOTATIONS ─────────────────────────────────────────────────────
+function textSprite(text,fontSize,color){
+  const c=document.createElement('canvas');c.width=256;c.height=48;
+  const ctx=c.getContext('2d');
+  ctx.font=`400 ${fontSize}px Inter,sans-serif`;
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;
+  ctx.fillText(text.length>16?text.slice(0,14)+'...':text,128,24);
+  const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;
+  return new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));
+}
+
+function dynMark(tNorm,text,staveY){
+  const sp=textSprite(text,24,'#444');
+  sp.position.copy(cPos(tNorm,-0.5,staveY));
+  sp.position.add(cNorm(tNorm).multiplyScalar(0.06));
+  sp.scale.set(0.4,0.18,1);
+  return sp;
+}
+
+function label(tNorm,text,staffLine,color,staveY){
+  const sp=textSprite(text,17,color||'#777');
+  sp.position.copy(cPos(tNorm,staffLine,staveY));
+  sp.position.y+=staffLine>=2.5?-0.42:0.52;
+  sp.position.add(cNorm(tNorm).multiplyScalar(0.08));
+  sp.scale.set(1.0,0.18,1);
+  return sp;
+}
+
+function legatoSlur(positions){
+  if(positions.length<2)return null;
+  const f=positions[0],l=positions[positions.length-1];
+  const mid=f.clone().lerp(l,0.5);
+  mid.y+=0.55;
+  const curve=new THREE.QuadraticBezierCurve3(
+    f.clone().add(new THREE.Vector3(0,0.26,0)),
+    mid,
+    l.clone().add(new THREE.Vector3(0,0.26,0))
+  );
+  const g=new THREE.TubeGeometry(curve,40,0.014,6,false);
+  return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0x444444,transparent:true,opacity:0.5}));
+}
+
+function crescendo(t1,t2,growing,staveY){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:0x555555});
+  for(const sign of[1,-1]){
+    const pts=[];
+    for(let i=0;i<=24;i++){
+      const t=t1+(t2-t1)*i/24;
+      const p=cPos(t,-0.9,staveY);
+      const spread=(growing?i/24:1-i/24)*0.10;
+      pts.push(p.clone().add(new THREE.Vector3(0,sign*spread,0)));
+    }
+    const curve=new THREE.CatmullRomCurve3(pts);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,24,0.006,4,false),mat));
+  }
+  return g;
+}
+
+// ─── LOAD SCORE ──────────────────────────────────────────────────────
+function clear(){
+  staffG.clear();noteG.clear();annoG.clear();
+  meshes=[];meshMap.clear();selMesh=null;
+}
+
+function load(key){
+  clear();
+  const score=SCORES[key];if(!score)return;
+  curScore=score;
+
+  const notes=score.notes,N=notes.length;
+  const phrases=analyzeLegato(notes);
+  const isBi=!!score.bimanual;
+
+  // Staff lines
+  if(isBi){
+    const topY=1.2, botY=-1.2;
+    drawStaff(topY); drawStaff(botY);
+    annoG.add(clefSprite(0.025,topY));
+    annoG.add(bassClefSprite(0.025,botY));
+    annoG.add(timeSigSprite(0.065,topY));
+    annoG.add(timeSigSprite(0.065,botY));
+    annoG.add(braceSprite(0.005,topY,botY));
+  } else {
+    drawStaff(0);
+    annoG.add(clefSprite(0.025,0));
+    annoG.add(timeSigSprite(0.065,0));
+  }
+
+  // Time slots
+  let timeSlots=[];
+  if(score.parallel_groups){
+    let t=0;const asg=new Set();
+    for(const pg of score.parallel_groups){for(const i of pg){timeSlots[i]=t;asg.add(i)}t++}
+    for(let i=0;i<N;i++)if(!asg.has(i)){timeSlots[i]=t;t++}
+  }else{for(let i=0;i<N;i++)timeSlots[i]=i}
+  const maxT=Math.max(...timeSlots);
+
+  // Opening barline
+  drawBarline(0.005,true,0,isBi);
+
+  const positions=[];
+  let prevDynLvl=0;
+
+  for(let i=0;i<N;i++){
+    const n=notes[i];
+    const tN=maxT>0?timeSlots[i]/maxT*0.72+0.14:0.5;
+    const sl=lane(n.type);
+    const isLP=phrases.some(p=>p.includes(i));
+
+    // Stave Y for bimanual
+    let stY=0;
+    if(isBi){
+      stY=n.arm==='left'?-1.2:1.2;
+    }
+
+    positions[i]=cPos(tN,sl,stY).clone();
+    noteG.add(makeNote(n,tN,sl,i,isLP,stY));
+
+    // Note labels disabled - phase labels shown as rehearsal marks instead
+
+    const d=dyn(n.params);
+    if(d){
+      annoG.add(dynMark(tN,d,stY));
+      const lvl='pppmpmffff'.indexOf(d);
+      if(i>0&&prevDynLvl>0&&Math.abs(lvl-prevDynLvl)>=4){
+        const prevT=maxT>0?timeSlots[i-1]/maxT*0.72+0.14:0.5;
+        annoG.add(crescendo(prevT,tN,lvl>prevDynLvl,stY));
+      }
+      prevDynLvl=lvl;
+    }
+  }
+
+  // Phase labels (rehearsal marks above the staff)
+  if(score.phases){
+    for(const ph of score.phases){
+      const startT=maxT>0?timeSlots[ph.start]/maxT*0.72+0.14:0.5;
+      const endT=maxT>0?timeSlots[ph.end]/maxT*0.72+0.14:0.5;
+      const midT=(startT+endT)/2;
+      const sp=textSprite(ph.label,20,'#333');
+      sp.position.copy(cPos(midT,SL+0.5,isBi?1.2:0));
+      sp.position.add(cNorm(midT).multiplyScalar(0.08));
+      sp.scale.set(0.9,0.18,1);
+      annoG.add(sp);
+
+      // Bracket line under the label spanning the phase
+      if(ph.start!==ph.end){
+        const pts=[];
+        for(let j=0;j<=12;j++){
+          const tt=startT+(endT-startT)*j/12;
+          const p=cPos(tt,SL-0.2,isBi?1.2:0);
+          p.y+=LG*1.2;
+          pts.push(p);
+        }
+        const curve=new THREE.CatmullRomCurve3(pts);
+        const geom=new THREE.TubeGeometry(curve,12,0.005,4,false);
+        annoG.add(new THREE.Mesh(geom,new THREE.MeshBasicMaterial({color:0x999999})));
+      }
+    }
+  }
+
+  // Barlines between phrases
+  for(let i=0;i<N-1;i++){
+    const samePh=phrases.some(p=>p.includes(i)&&p.includes(i+1));
+    if(!samePh&&timeSlots[i]!==timeSlots[i+1]){
+      const midT=((timeSlots[i]+timeSlots[i+1])/2)/maxT*0.72+0.14;
+      drawBarline(midT,false,0,isBi);
+    }
+  }
+
+  // Final double barline
+  const endT=0.90;
+  drawBarline(endT,false,0,isBi);
+  drawBarline(endT+0.012,true,0,isBi);
+
+  // Legato slurs
+  for(const ph of phrases){
+    const slur=legatoSlur(ph.map(i=>positions[i]));
+    if(slur)annoG.add(slur);
+  }
+
+  score._phrases=phrases;
+}
+
+// ─── INTERACTION ─────────────────────────────────────────────────────
+const tooltip=document.getElementById('tooltip');
+let hoveredGroup=null;
+
+function castRay(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  return raycaster.intersectObjects(meshes,false);
+}
+
+// Hover highlight
+renderer.domElement.addEventListener('pointermove',e=>{
+  const hits=castRay(e);
+  if(hits.length>0){
+    const info=meshMap.get(hits[0].object);
+    if(info&&hoveredGroup!==info.group){
+      if(hoveredGroup&&hoveredGroup!==info.group){
+        const prev=meshMap.get(selMesh);
+        if(!selMesh||meshMap.get(selMesh)?.group!==hoveredGroup){
+          hoveredGroup.scale.set(1,1,1);
+        }
+      }
+      hoveredGroup=info.group;
+      if(!selMesh||meshMap.get(selMesh)?.group!==hoveredGroup){
+        hoveredGroup.scale.set(1.1,1.1,1.1);
+      }
+      renderer.domElement.style.cursor='pointer';
+    }
+  } else {
+    if(hoveredGroup&&(!selMesh||meshMap.get(selMesh)?.group!==hoveredGroup)){
+      hoveredGroup.scale.set(1,1,1);
+    }
+    hoveredGroup=null;
+    renderer.domElement.style.cursor='crosshair';
+  }
+});
+
+// Click to select + show tooltip
+renderer.domElement.addEventListener('click',e=>{
+  const hits=castRay(e);
+  if(hits.length>0){
+    const info=meshMap.get(hits[0].object);
+    if(info){
+      // Deselect previous
+      if(selMesh){
+        const prev=meshMap.get(selMesh);
+        if(prev&&prev.visualMesh){
+          prev.visualMesh.material.emissive=new THREE.Color(0);
+          prev.group.scale.set(1,1,1);
+        }
+      }
+      // Select new
+      selMesh=hits[0].object;
+      if(info.visualMesh){
+        info.visualMesh.material.emissive=new THREE.Color(CAT_COL[cat(info.data.type)]);
+        info.visualMesh.material.emissiveIntensity=0.5;
+      }
+      info.group.scale.set(1.18,1.18,1.18);
+
+      // Show tooltip
+      const nd=info.data;
+      const c=cat(nd.type);
+      const d=dyn(nd.params);
+      const nv=noteVal(nd.type,nd.params);
+      const art=info.isLeg?'legato':'staccato';
+      tooltip.innerHTML=
+        `<div style="font-weight:600;color:${CAT_HEX[c]};margin-bottom:4px">${nd.type}</div>`+
+        (nd.label?`<div style="color:#666;margin-bottom:6px">${nd.label}</div>`:'')+
+        `<div style="color:#888;font-size:10px">`+
+        `${nv} note * ${art}`+
+        (d?` * <span style="font-style:italic">${d}</span> (${nd.params.force||nd.params.force_n}N)`:'')+
+        `</div>`;
+      tooltip.style.display='block';
+      tooltip.style.left=Math.min(e.clientX+16, window.innerWidth-280)+'px';
+      tooltip.style.top=Math.min(e.clientY-20, window.innerHeight-100)+'px';
+
+      // Load rollout frame if available
+      const scoreKey=document.getElementById('score-select').value;
+      showFrameInTooltip(tooltip,scoreKey,info.index);
+    }
+  } else {
+    // Deselect
+    if(selMesh){
+      const prev=meshMap.get(selMesh);
+      if(prev&&prev.visualMesh){
+        prev.visualMesh.material.emissive=new THREE.Color(0);
+        prev.group.scale.set(1,1,1);
+      }
+      selMesh=null;
+    }
+    tooltip.style.display='none';
+  }
+});
+
+document.getElementById('score-select').addEventListener('change',function(){load(this.value)});
+
+// ─── ANIMATE ─────────────────────────────────────────────────────────
+function onResize(){
+  const w=container.clientWidth,h=container.clientHeight;
+  camera.aspect=w/h;camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+}
+window.addEventListener('resize',onResize);
+
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.003;ctrl.update();
+  if(selMesh){
+    const info=meshMap.get(selMesh);
+    if(info)info.group.scale.setScalar(1.15+Math.sin(t*8)*0.03);
+  }
+  renderer.render(scene,camera);
+}
+
+try{
+  onResize();
+  load('mug_pour');
+  animate();
+  console.log('SPARK Score Visualizer loaded OK');
+}catch(e){
+  document.body.innerHTML=`<pre style="padding:20px;color:red">Init error: ${e.message}\n${e.stack}</pre>`;
+}
+
+</script>
+</body>
+</html>

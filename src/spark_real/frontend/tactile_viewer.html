@@ -1,0 +1,240 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>FlexiTac Live</title>
+<style>
+  html,body{margin:0;background:#0b0d10;color:#e6e6e6;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px}
+  h1{font-size:15px;font-weight:600;letter-spacing:.06em;color:#9aa4b2;margin:0}
+  .controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;
+            font-size:12px;color:#9aa4b2;background:#111419;border:1px solid #23262c;
+            border-radius:8px;padding:8px 14px}
+  .controls label{display:flex;gap:6px;align-items:center}
+  .controls select,.controls input[type=range]{accent-color:#22c55e;background:#1a1d22;color:#e6e6e6;
+            border:1px solid #2b2f36;border-radius:4px;font:inherit}
+  .controls button{background:#1a1d22;color:#e6e6e6;border:1px solid #2b2f36;border-radius:4px;
+            font:inherit;padding:2px 10px;cursor:pointer}
+  .controls button:hover{border-color:#3d434c}
+  .v{color:#e6e6e6;font-variant-numeric:tabular-nums}
+  .k{color:#7d8794}
+  .pads{display:flex;gap:22px;flex-wrap:nowrap;justify-content:center;align-items:flex-start;max-width:100vw}
+  .panel{display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .3s}
+  .panel.stale{opacity:.35}
+  .padbox{position:relative}
+  .padbox canvas{display:block;border-radius:8px;border:1px solid #23262c;background:#000}
+  .padbox canvas.pix{image-rendering:pixelated}
+  .sidelabel{position:absolute;top:8px;left:10px;font-size:12px;font-weight:700;letter-spacing:.12em;
+             color:#fff;text-shadow:0 0 4px #000,0 0 8px #000;pointer-events:none}
+  .stats{display:flex;gap:18px;align-items:center;font-size:13px;flex-wrap:wrap;justify-content:center}
+  .dot{width:13px;height:13px;border-radius:50%;background:#333;display:inline-block;
+       vertical-align:middle;margin-right:7px;transition:background .05s,box-shadow .05s}
+  .dot.on{background:#22c55e;box-shadow:0 0 12px #22c55e}
+  .state{font-size:15px;font-weight:700;letter-spacing:.04em}
+  .bar{width:100%;max-width:300px;height:10px;background:#1a1d22;border-radius:5px;overflow:hidden}
+  .fill{height:100%;width:0%;background:linear-gradient(90deg,#3b0d0d,#ff3b30,#ffd23b);transition:width .05s}
+  .muted{color:#5a626d;font-size:12px}
+</style></head>
+<body><div class="wrap">
+  <h1>FLEXITAC &mdash; LIVE FORCE MAP</h1>
+  <div class="controls">
+    <label>full-scale
+      <input type="range" id="full" min="25" max="300" step="5" value="150">
+      <span id="fullv" class="v">150</span> <span class="k">counts</span>
+    </label>
+    <label><input type="checkbox" id="smooth"> smooth</label>
+    <button id="orient">portrait</button>
+    <button id="rezero" title="Recapture the zero baseline (~1s). Do NOT touch the pads while it runs.">re-zero</button>
+  </div>
+  <div class="pads" id="pads"></div>
+  <div class="muted" id="conn">connecting&hellip;</div>
+</div>
+<script>
+  'use strict';
+  const SCALE = 16;
+  const sideFilter = new URLSearchParams(location.search).get('side');
+
+  // 256-entry RGB LUT (matplotlib inferno), hex-packed 6 chars/entry.
+  const LUT_HEX = '00000401000501010601010802010a02020c02020e03021004031204031405041706041907051b08051d09061f0a07220b07240c08260d08290e092b10092d110a30120a32140b34150b37160b39180c3c190c3e1b0c411c0c431e0c451f0c48210c4a230c4c240c4f260c51280b53290b552b0b572d0b592f0a5b310a5c320a5e340a5f3609613809623909633b09643d09653e0966400a67420a68440a68450a69470b6a490b6a4a0c6b4c0c6b4d0d6c4f0d6c510e6c520e6d540f6d550f6d57106e59106e5a116e5c126e5d126e5f136e61136e62146e64156e65156e67166e69166e6a176e6c186e6d186e6f196e71196e721a6e741a6e751b6e771c6d781c6d7a1d6d7c1d6d7d1e6d7f1e6c801f6c82206c84206b85216b87216b88226a8a226a8c23698d23698f24699025689225689326679526679727669827669a28659b29649d29649f2a63a02a63a22b62a32c61a52c60a62d60a82e5fa92e5eab2f5ead305dae305cb0315bb1325ab3325ab43359b63458b73557b93556ba3655bc3754bd3853bf3952c03a51c13a50c33b4fc43c4ec63d4dc73e4cc83f4bca404acb4149cc4248ce4347cf4446d04545d24644d34743d44842d54a41d74b3fd84c3ed94d3dda4e3cdb503bdd513ade5238df5337e05536e15635e25734e35933e45a31e55c30e65d2fe75e2ee8602de9612bea632aeb6429eb6628ec6726ed6925ee6a24ef6c23ef6e21f06f20f1711ff1731df2741cf3761bf37819f47918f57b17f57d15f67e14f68013f78212f78410f8850ff8870ef8890cf98b0bf98c0af98e09fa9008fa9207fa9407fb9606fb9706fb9906fb9b06fb9d07fc9f07fca108fca309fca50afca60cfca80dfcaa0ffcac11fcae12fcb014fcb216fcb418fbb61afbb81dfbba1ffbbc21fbbe23fac026fac228fac42afac62df9c72ff9c932f9cb35f8cd37f8cf3af7d13df7d340f6d543f6d746f5d949f5db4cf4dd4ff4df53f4e156f3e35af3e55df2e661f2e865f2ea69f1ec6df1ed71f1ef75f1f179f2f27df2f482f3f586f3f68af4f88ef5f992f6fa96f8fb9af9fc9dfafda1fcffa4';
+  const LUT = new Uint8Array(768);
+  for (let i = 0; i < 768; i++) LUT[i] = parseInt(LUT_HEX.substr(i * 2, 2), 16);
+
+  // --- settings (persisted) ---
+  const store = {
+    get: (k, d) => { const v = localStorage.getItem('ft_' + k); return v === null ? d : v; },
+    set: (k, v) => localStorage.setItem('ft_' + k, v),
+  };
+  const elFull = document.getElementById('full');
+  const elFullV = document.getElementById('fullv');
+  const elSmooth = document.getElementById('smooth');
+  const elOrient = document.getElementById('orient');
+  let fullScale = parseInt(store.get('full', '150'), 10);
+  let smooth = store.get('smooth', '0') === '1';
+  let portrait = store.get('orient', 'portrait') !== 'landscape';
+  elFull.value = fullScale; elFullV.textContent = fullScale;
+  elSmooth.checked = smooth; elOrient.textContent = portrait ? 'portrait' : 'landscape';
+  elFull.oninput = () => { fullScale = parseInt(elFull.value, 10); elFullV.textContent = fullScale;
+                           store.set('full', String(fullScale)); redrawAll(); };
+  elSmooth.onchange = () => { smooth = elSmooth.checked; store.set('smooth', smooth ? '1' : '0'); redrawAll(); };
+  elOrient.onclick = () => { portrait = !portrait; store.set('orient', portrait ? 'portrait' : 'landscape');
+                             elOrient.textContent = portrait ? 'portrait' : 'landscape';
+                             for (const p of Object.values(panels)) sizeCanvas(p); redrawAll(); };
+  const elRezero = document.getElementById('rezero');
+  elRezero.onclick = async () => {
+    elRezero.disabled = true;
+    elRezero.textContent = 're-zeroing...';
+    let label = 'failed';
+    try {
+      const r = await fetch('/api/tactile/rebaseline', { method: 'POST' });
+      const j = await r.json();
+      if (!j.connected) label = 'no sensor';
+      else label = j.sides.every(s => s.ok) ? 'zeroed' : 'timed out';
+    } catch (e) { /* label stays 'failed' */ }
+    elRezero.textContent = label;
+    setTimeout(() => { elRezero.textContent = 're-zero'; elRezero.disabled = false; }, 1500);
+  };
+
+  // --- panels, one per side ---
+  const panels = {};  // side -> {root, canvas, ctx, off, offCtx, dot, state, force, cells, seq, fill, rows, cols, last}
+  function makePanel(side) {
+    const root = document.createElement('div'); root.className = 'panel';
+    root.innerHTML =
+      '<div class="padbox"><canvas></canvas><span class="sidelabel">' + side.toUpperCase() + '</span></div>' +
+      '<div class="bar"><div class="fill"></div></div>' +
+      '<div class="stats">' +
+        '<div><span class="dot"></span><span class="state v">--</span></div>' +
+        '<div><span class="k">force</span> <span class="force v">0</span> <span class="muted">counts</span></div>' +
+        '<div><span class="k">cells</span> <span class="cells v">0</span></div>' +
+        '<div><span class="k">seq</span> <span class="seq v">0</span></div>' +
+      '</div>';
+    document.getElementById('pads').appendChild(root);
+    const p = {
+      root,
+      canvas: root.querySelector('canvas'),
+      dot: root.querySelector('.dot'), state: root.querySelector('.state'),
+      force: root.querySelector('.force'), cells: root.querySelector('.cells'),
+      seq: root.querySelector('.seq'), fill: root.querySelector('.fill'),
+      rows: 0, cols: 0, last: null,
+    };
+    p.ctx = p.canvas.getContext('2d');
+    p.off = document.createElement('canvas');
+    p.offCtx = p.off.getContext('2d');
+    panels[side] = p;
+    return p;
+  }
+  function sizeCanvas(p) {
+    if (!p.rows) return;
+    const w = portrait ? p.rows * SCALE : p.cols * SCALE;
+    const h = portrait ? p.cols * SCALE : p.rows * SCALE;
+    if (p.canvas.width !== w || p.canvas.height !== h) { p.canvas.width = w; p.canvas.height = h; }
+    // Height-first sizing, then clamp so every pad's width fits its share
+    // of the viewport (page padding 2x18 + 22px flex gaps) - pads shrink
+    // as the window narrows instead of wrapping onto a second row.
+    const n = Math.max(1, Object.keys(panels).length);
+    const availW = (window.innerWidth - 36 - 22 * (n - 1)) / n;
+    let cssH = portrait
+      ? Math.min(window.innerHeight * 0.66, 540)
+      : Math.min(window.innerHeight * 0.66, 540) * p.rows / p.cols;
+    cssH = Math.min(cssH, Math.max(80, availW * h / w));
+    p.canvas.style.height = cssH + 'px';
+    p.canvas.style.width = 'auto';
+  }
+  function draw(p) {
+    const s = p.last;
+    if (!s) return;
+    if (p.rows !== s.rows || p.cols !== s.cols) {
+      p.rows = s.rows; p.cols = s.cols;
+      p.off.width = s.cols; p.off.height = s.rows;
+      sizeCanvas(p);
+    }
+    const lut = LUT;
+    const img = p.offCtx.createImageData(s.cols, s.rows);
+    const d = img.data;
+    let i = 0;
+    for (let r = 0; r < s.rows; r++) {
+      const row = s.delta[r];
+      for (let c = 0; c < s.cols; c++) {
+        let v = row[c] / fullScale;
+        v = v < 0 ? 0 : (v > 1 ? 1 : v);
+        const k = (v * 255 + 0.5) | 0, k3 = k * 3;
+        d[i] = lut[k3]; d[i + 1] = lut[k3 + 1]; d[i + 2] = lut[k3 + 2]; d[i + 3] = 255;
+        i += 4;
+      }
+    }
+    p.offCtx.putImageData(img, 0, 0);
+    const ctx = p.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+    ctx.imageSmoothingEnabled = smooth;
+    p.canvas.className = smooth ? '' : 'pix';
+    if (portrait) {              // rotate 90 deg CCW, matching np.rot90(k=1)
+      ctx.translate(0, p.canvas.height);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.drawImage(p.off, 0, 0, s.cols, s.rows, 0, 0, s.cols * SCALE, s.rows * SCALE);
+    if (s.in_contact && s.centroid_uv) {   // crosshair in pre-rotation coords
+      const cx = (s.centroid_uv[0] + 0.5) * SCALE, cy = (s.centroid_uv[1] + 0.5) * SCALE;
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 12, cy); ctx.lineTo(cx + 12, cy);
+      ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  function redrawAll() { for (const p of Object.values(panels)) draw(p); }
+
+  function updateStats(p, s) {
+    p.force.textContent = Math.round(s.max_response);
+    p.cells.textContent = s.contact_cell_count;
+    p.seq.textContent = s.seq;
+    p.fill.style.width = Math.min(100, 100 * s.max_response / fullScale) + '%';
+    p.dot.className = s.in_contact ? 'dot on' : 'dot';
+    p.state.textContent = s.in_contact ? 'CONTACT' : 'no contact';
+    p.state.style.color = s.in_contact ? '#22c55e' : '#7d8794';
+  }
+
+  // --- websocket ---
+  const conn = document.getElementById('conn');
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(proto + '//' + location.host + '/ws/tactile');
+    ws.onmessage = (ev) => {
+      const j = JSON.parse(ev.data);
+      if (!j.connected) {
+        conn.textContent = 'no sensor connected';
+        for (const p of Object.values(panels)) p.root.classList.add('stale');
+        return;
+      }
+      let sides = j.sides || [];
+      if (sideFilter) sides = sides.filter(x => x.side === sideFilter);
+      if (!sides.length) {
+        conn.textContent = sideFilter ? 'side "' + sideFilter + '" not found' : 'no sides reported';
+        for (const p of Object.values(panels)) p.root.classList.add('stale');
+        return;
+      }
+      const seen = new Set();
+      for (const s of sides) {
+        seen.add(s.side);
+        let p = panels[s.side];
+        if (!p) {   // panel count changed -> every pad's width share changed
+          p = makePanel(s.side);
+          for (const q of Object.values(panels)) sizeCanvas(q);
+        }
+        p.root.classList.remove('stale');
+        p.last = s;
+        draw(p);
+        updateStats(p, s);
+      }
+      for (const [side, p] of Object.entries(panels))
+        if (!seen.has(side)) p.root.classList.add('stale');
+      const dims = sides[0].rows + 'x' + sides[0].cols;
+      conn.textContent = 'connected | ' + dims + ' | ' + sides.map(s => s.side).join(' + ');
+    };
+    ws.onclose = () => { conn.textContent = 'reconnecting...'; setTimeout(connect, 1000); };
+    ws.onerror = () => ws.close();
+  }
+  window.addEventListener('resize', () => { for (const p of Object.values(panels)) sizeCanvas(p); });
+  connect();
+</script>
+</body></html>

@@ -1,0 +1,11 @@
+# DEPRECATED — dependencies now live in the repo-root pyproject.toml
+# (single source of truth). Install the package instead of this file.
+#
+# torch / torchvision come from the pytorch.org CUDA (cu130) wheel index via
+# setup_spark_conda.bash — install those first, then from the REPO ROOT:
+#
+#   pip install -e ".[planning,perception,sim]"      # + a robot extra, e.g. ur10e
+#
+# The Franka driver (franky-control) is a local wheel; see ../SETUP.md.
+# The full pinned rig environment (conda + cu130 torch + SAM3 + franky) is
+# ../environment.yml.

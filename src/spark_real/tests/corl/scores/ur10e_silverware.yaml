@@ -1,0 +1,75 @@
+# Silverware sort task -- UR10e + Robotiq 2F-85
+# Sort knife, fork, and spoon into a utensil tray.
+# Uses legacy UR10e primitives (move_to_keypoint + grasp).
+task: sort the silverware into the tray
+tree:
+  type: sequence
+  children:
+    # 1. Pick up the knife
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "knife"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "knife"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 50
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    - type: place_in_slot
+      params:
+        container_label: "tray"
+        slot_idx: 0
+    - type: release
+      params: {}
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}
+
+    # 2. Pick up the fork
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "fork"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "fork"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 50
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    - type: place_in_slot
+      params:
+        container_label: "tray"
+        slot_idx: 1
+    - type: release
+      params: {}
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}
+
+    # 3. Pick up the spoon
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "spoon"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "spoon"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 50
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    - type: place_in_slot
+      params:
+        container_label: "tray"
+        slot_idx: 2
+    - type: release
+      params: {}
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}

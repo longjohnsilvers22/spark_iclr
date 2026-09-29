@@ -1,0 +1,55 @@
+# "pick up the silverware" -- ZERO human episodes (the corpus directory is
+# empty). There is nothing to compare a SPARK policy against for this task,
+# so it is NOT part of the matched 7-task set. Recording it is only worth
+# doing if human episodes are collected for it too.
+#
+# The entry is here because the task is otherwise ready: it reuses the
+# cutlery tray and the utensils from the knife/spoon tasks, so nothing new
+# has to be staged.
+#
+# Scene assumption (NOT verified against human frames -- there are none):
+# the slotted cutlery tray plus one or more utensils on the table. Counts
+# are therefore permissive, and on_mismatch is best_effort rather than
+# abort: aborting on an unverified arity would simply never run.
+task: "pick up the silverware"
+aliases:
+  - "put the silverware in the tray"
+  - "put the utensils in the tray"
+  - "sort the silverware"
+
+per_instance_z: true
+
+groups:
+  - text: "knife handle"
+    multi_instance: true
+    expect: {min: 0, max: 2}
+    min_conf: 0.10
+    order_by: [world_x, world_y]
+    alt_prompts: ["knife"]
+
+  - text: "spoon handle"
+    multi_instance: true
+    expect: {min: 0, max: 2}
+    min_conf: 0.10
+    order_by: [world_x, world_y]
+    alt_prompts: ["spoon"]
+
+  - text: "fork handle"
+    multi_instance: true
+    expect: {min: 0, max: 2}
+    min_conf: 0.10
+    order_by: [world_x, world_y]
+    alt_prompts: ["fork"]
+
+  - text: "tray"
+    expect: {min: 1, max: 1}
+    min_conf: 0.10
+    alt_prompts: ["cutlery tray", "silverware tray", "utensil tray"]
+
+# At least the tray plus one utensil, or there is nothing to pick.
+require:
+  min_total: 2
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: best_effort

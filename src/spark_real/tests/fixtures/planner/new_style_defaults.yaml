@@ -1,0 +1,31 @@
+```yaml
+task: put the knife in the tray
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "knife handle 1"
+        offset_z: 0
+        grasp_strategy: "auto"
+        grasp_yaw_deg: null
+    - type: grasp
+      params:
+        force: 50
+        target_width: 0.008
+        grasp_strategy: "auto"
+    - type: move_relative
+      params:
+        dx: 0
+        dy: 0
+        dz: 0.20
+    - type: place_in_slot
+      params:
+        container_label: "tray"
+        slot_idx: 0
+verify:
+  all:
+    - pred: inside
+      obj: "knife handle 1"
+      container: "tray"
+```

@@ -1,0 +1,162 @@
+<mujoco model="corl_f4_fold">
+  <!--
+    CoRL F4: fold cloth task.
+      - Panda arm at world origin (table in front).
+      - Cloth: low-stiffness composite of N x N small cylinders linked by
+        equality constraints. MuJoCo native rope/composite would be cleaner,
+        but for a one-shot demo we use a simple flat sheet built from a
+        composite particle/box grid.
+
+        Cheaper alternative used here: a 2x2 grid of thin boxes weakly
+        linked by equality(joint connect) — gives the appearance of a
+        cloth with one corner you can pinch and bring across.
+
+        For the CoRL deadline we use a SIMPLIFIED napkin: two thin plates
+        joined at one edge by a hinge. Pinching the free corner and bringing
+        it to the hinged corner closes the fold.
+      - Cameras: agentview, sideview, topview.
+
+    Trajectory the test exercises (mirrors fold primitive flow):
+      Phase 1 (top-down hover above corner): joint move
+      Phase 2 (descend to pinch corner with reduced target_width): joint + ramp
+      Phase 3 (lift to safe Z): joint move
+      Phase 4 (arc across to far corner): joint move
+      Phase 5 (lower corner onto far corner): joint move
+      Phase 6 (release gripper): smooth ramp
+      Phase 7 (retreat): joint move
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="cloth_mat" rgba="0.95 0.30 0.30 1"
+              specular="0.05" shininess="0.05" reflectance="0.0"/>
+    <material name="cloth_mat_b" rgba="0.95 0.45 0.25 1"
+              specular="0.05" shininess="0.05" reflectance="0.0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <body name="table" pos="0.55 0 -0.01">
+      <geom name="table_top" type="box" size="0.45 0.4 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Simplified cloth = hinged two-plate napkin. Hinge lies along world Y
+      at x=0.50 (the centre of the napkin's spread footprint). The FIXED
+      half (under the hinge) is in -Y panel, lying flat on the table.
+      The HINGED half (over the hinge) starts flat at +Y from the hinge
+      line and can rotate +180° about the hinge to fold onto the fixed
+      half.
+
+      Pinch target is the FREE (far-Y) edge of the hinged half. With
+      hinge at x=0.50, y=0.0, and panel size 0.10m in X by 0.18m in Y,
+      the free edge is at y=+0.18 and the centre of the free edge is at
+      (x=0.50, y=+0.18, z=0.002).
+    -->
+
+    <!-- Fixed (lower) half of the napkin: stays on the table -->
+    <body name="napkin_fixed" pos="0.50 -0.09 0">
+      <geom name="napkin_fixed_geom" type="box"
+            size="0.10 0.09 0.001" pos="0 0 0.001"
+            material="cloth_mat"
+            condim="6" friction="0.5 0.2 0.001"/>
+    </body>
+
+    <!--
+      Hinged half. The free joint is a hinge about world X at y=0.0 (the
+      shared edge between the two halves). The body's geom extends in +Y
+      from the hinge by 0.18m.
+      To get a hinge at y=0.0, we place the body's origin AT the hinge axis
+      (x=0.50, y=0.0, z=0.001) and use a hinge joint at axis="1 0 0" with
+      reference y=0.
+
+      Pinch corner (free edge centre, world):
+        flat:    (0.50, +0.18, 0.002)
+        folded:  (0.50, -0.18, 0.002) when hinged half rotates 180° about hinge
+
+      Initial state: flat (hinge angle = 0). After fold, the free edge
+      should land approximately on the fixed half (so the napkin is now
+      a stacked two-layer rectangle at -Y side).
+    -->
+    <body name="napkin_hinge" pos="0.50 0 0.002">
+      <!-- Hinge damping/frictionloss very low so the gripper can rotate
+           the panel with the moderate pinch force we apply. The panel is
+           light (20 g) so even tiny resistance prevents motion. -->
+      <joint name="napkin_hinge_j" type="hinge" axis="1 0 0" pos="0 0 0"
+             range="0 3.142" damping="0.001" frictionloss="0.0001"/>
+      <inertial pos="0 0.09 0" mass="0.02"
+                diaginertia="5e-5 1e-5 5e-5"/>
+      <geom name="napkin_hinge_geom" type="box"
+            size="0.10 0.09 0.001" pos="0 0.09 0"
+            material="cloth_mat_b"
+            condim="6" friction="0.5 0.2 0.001"
+            solimp="0.95 0.99 0.001" solref="0.02 1"/>
+      <!-- Pinch handle: tiny grip-friendly bump at the FREE edge centre.
+           This is what the gripper actually closes on (the thin sheet itself
+           is too thin for the panda jaws to pinch reliably). Marks the
+           corner with a colour-distinct cube so the proof video shows it. -->
+      <body name="pinch_corner" pos="0 0.175 0.025">
+        <!-- Handle: 60mm (X) x 30mm (Y) x 50mm (Z), centred at z=0.025.
+             Much bigger so the panda jaws (~80mm wide) actually contact
+             the body on both sides. Real cloth handles would be a corner
+             of the cloth pinched manually; in sim we approximate with
+             this graspable handle. -->
+        <geom name="pinch_corner_geom" type="box"
+              size="0.030 0.015 0.025" material="cloth_mat"
+              condim="6" friction="5 3 0.005"
+              solimp="0.9 0.95 0.005" solref="0.02 1"/>
+        <site name="pinch_target" pos="0 0 0.005" size="0.005"
+              rgba="0 1 0 0" type="sphere"/>
+      </body>
+    </body>
+
+    <body name="cam_target" pos="0.5 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.5 0.0 0.9">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.55 -1.1 0.5">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.5 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785 0.04 0.04 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785 255"/>
+  </keyframe>
+</mujoco>

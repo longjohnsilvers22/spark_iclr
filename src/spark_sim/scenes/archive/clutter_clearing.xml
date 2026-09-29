@@ -1,0 +1,210 @@
+<mujoco model="clutter_clearing">
+  <!-- SPARK scene: Cluttered table clearing with mesh-based objects from object_sim -->
+  <include file="ur_gripper.xml"/>
+
+  <compiler angle="radian" autolimits="true" />
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <default>
+    <default class="object_visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="1"/>
+    </default>
+    <default class="object_collision">
+      <geom type="mesh" density="1000" contype="1" conaffinity="1" friction="1 0.5 0.01" condim="4" group="3"/>
+    </default>
+  </default>
+
+  <asset>
+    <!-- Environment textures -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8" rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="floor_tex" builtin="checker" rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512" mark="cross" markrgb="0.5 0.5 0.55"/>
+    <material name="floor_mat" texture="floor_tex" texrepeat="15 15" reflectance="0.2"/>
+    <material name="table_ceramic" rgba="0.9 0.9 0.92 1"/>
+    <material name="table_legs_metal" rgba="0.5 0.5 0.55 1" reflectance="0.6" shininess="0.8"/>
+    <material name="walls_mat" rgba="0.9 0.9 0.92 1" reflectance="0.1"/>
+    <material name="bin_mat" rgba="0.3 0.35 0.4 1" reflectance="0.15"/>
+    <material name="pedestal_mat" rgba="0.3 0.4 0.7 1" reflectance="0.5"/>
+
+    <!-- Duck meshes -->
+    <mesh name="duck_visual" file="../../../object_sim/duck/duck.stl" scale="1 1 1"/>
+    <mesh name="duck_col0" file="../../../object_sim/duck/contact0.stl" scale="1 1 1"/>
+    <mesh name="duck_col1" file="../../../object_sim/duck/contact1.stl" scale="1 1 1"/>
+
+    <!-- Apple meshes -->
+    <mesh name="apple_visual" file="../../../object_sim/apple/apple.stl" scale="1 1 1"/>
+    <mesh name="apple_col0" file="../../../object_sim/apple/contact0.stl" scale="1 1 1"/>
+
+    <!-- Banana meshes (5 collision) -->
+    <mesh name="banana_visual" file="../../../object_sim/banana/banana.stl" scale="1 1 1"/>
+    <mesh name="banana_col0" file="../../../object_sim/banana/contact0.stl" scale="1 1 1"/>
+    <mesh name="banana_col1" file="../../../object_sim/banana/contact1.stl" scale="1 1 1"/>
+    <mesh name="banana_col2" file="../../../object_sim/banana/contact2.stl" scale="1 1 1"/>
+    <mesh name="banana_col3" file="../../../object_sim/banana/contact3.stl" scale="1 1 1"/>
+    <mesh name="banana_col4" file="../../../object_sim/banana/contact4.stl" scale="1 1 1"/>
+
+    <!-- Lightbulb meshes -->
+    <mesh name="lightbulb_visual" file="../../../object_sim/lightbulb/lightbulb.stl" scale="1 1 1"/>
+    <mesh name="lightbulb_col0" file="../../../object_sim/lightbulb/contact0.stl" scale="1 1 1"/>
+    <mesh name="lightbulb_col1" file="../../../object_sim/lightbulb/contact1.stl" scale="1 1 1"/>
+
+    <!-- Camera meshes -->
+    <mesh name="camera_visual" file="../../../object_sim/camera/camera.stl" scale="1 1 1"/>
+    <mesh name="camera_col0" file="../../../object_sim/camera/contact0.stl" scale="1 1 1"/>
+    <mesh name="camera_col1" file="../../../object_sim/camera/contact1.stl" scale="1 1 1"/>
+
+    <!-- Mug meshes -->
+    <mesh name="mug_visual" file="../../../object_sim/mug/mug.stl" scale="1 1 1"/>
+    <mesh name="mug_col0" file="../../../object_sim/mug/contact0.stl" scale="1 1 1"/>
+    <mesh name="mug_col1" file="../../../object_sim/mug/contact1.stl" scale="1 1 1"/>
+
+    <!-- Flashlight meshes -->
+    <mesh name="flashlight_visual" file="../../../object_sim/flashlight/flashlight.stl" scale="1 1 1"/>
+    <mesh name="flashlight_col0" file="../../../object_sim/flashlight/contact0.stl" scale="1 1 1"/>
+
+    <!-- Stamp meshes -->
+    <mesh name="stamp_visual" file="../../../object_sim/stamp/stamp.stl" scale="1 1 1"/>
+    <mesh name="stamp_col0" file="../../../object_sim/stamp/contact0.stl" scale="1 1 1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Soft distributed lighting -->
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="-2 2 3" dir="0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+
+    <geom condim="3" group="1" material="floor_mat" name="floor" pos="0 0 0" size="3 3 .125" type="plane"/>
+
+
+    <!-- Robot pedestal -->
+    <body name="robot_pedestal" pos="-0.6 0 0.125">
+      <geom type="box" size="0.3 0.2 0.1" material="pedestal_mat"/>
+    </body>
+
+    <!-- Table -->
+    <body name="table" pos="0.6 0 0.4">
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" group="0" friction="1 0.005 0.0001"/>
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" conaffinity="0" contype="0" group="1" material="table_ceramic"/>
+      <geom pos="0.45 0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="0.45 -0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 -0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+    </body>
+
+    <!-- Collection bin -->
+    <body name="bin" pos="0.25 0 0.42">
+      <geom pos="0 0 0" size="0.1 0.15 0.01" type="box" material="bin_mat"/>
+      <geom pos="0.1 0 0.05" size="0.01 0.15 0.05" type="box" material="bin_mat"/>
+      <geom pos="-0.1 0 0.05" size="0.01 0.15 0.05" type="box" material="bin_mat"/>
+      <geom pos="0 0.15 0.05" size="0.1 0.01 0.05" type="box" material="bin_mat"/>
+      <geom pos="0 -0.15 0.05" size="0.1 0.01 0.05" type="box" material="bin_mat"/>
+    </body>
+
+    <!-- Scattered objects (mesh-based) -->
+
+    <!-- Duck -->
+    <body name="duck" pos="0.5 -0.25 0.46" euler="0 0 0.5">
+      <freejoint name="duck_free"/>
+      <geom name="duck_vis" mesh="duck_visual" rgba="0.95 0.85 0.2 1" class="object_visual"/>
+      <geom name="duck_col_0" mesh="duck_col0" class="object_collision" rgba="0.95 0.85 0.2 0"/>
+      <geom name="duck_col_1" mesh="duck_col1" class="object_collision" rgba="0.95 0.85 0.2 0"/>
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.00003 0.00003 0.00002"/>
+    </body>
+
+    <!-- Apple -->
+    <body name="apple" pos="0.55 -0.1 0.46" euler="0 0 1.2">
+      <freejoint name="apple_free"/>
+      <geom name="apple_vis" mesh="apple_visual" rgba="0.9 0.15 0.1 1" class="object_visual"/>
+      <geom name="apple_col_0" mesh="apple_col0" class="object_collision" rgba="0.9 0.15 0.1 0"/>
+      <inertial pos="0 0 0" mass="0.15" diaginertia="0.00005 0.00005 0.00005"/>
+    </body>
+
+    <!-- Banana (5 collision) -->
+    <body name="banana" pos="0.7 -0.15 0.46" euler="0 0 0.8">
+      <freejoint name="banana_free"/>
+      <geom name="banana_vis" mesh="banana_visual" rgba="0.95 0.9 0.2 1" class="object_visual"/>
+      <geom mesh="banana_col0" class="object_collision" rgba="0 0 0 0"/>
+      <geom mesh="banana_col1" class="object_collision" rgba="0 0 0 0"/>
+      <geom mesh="banana_col2" class="object_collision" rgba="0 0 0 0"/>
+      <geom mesh="banana_col3" class="object_collision" rgba="0 0 0 0"/>
+      <geom mesh="banana_col4" class="object_collision" rgba="0 0 0 0"/>
+      <inertial pos="0 0 0" mass="0.12" diaginertia="0.00003 0.00003 0.00001"/>
+    </body>
+
+    <!-- Lightbulb -->
+    <body name="lightbulb" pos="0.75 0.05 0.46" euler="0 0 -0.3">
+      <freejoint name="lightbulb_free"/>
+      <geom name="lightbulb_vis" mesh="lightbulb_visual" rgba="0.95 0.95 0.9 0.9" class="object_visual"/>
+      <geom name="lightbulb_col_0" mesh="lightbulb_col0" class="object_collision" rgba="0.95 0.95 0.9 0"/>
+      <geom name="lightbulb_col_1" mesh="lightbulb_col1" class="object_collision" rgba="0.95 0.95 0.9 0"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00002 0.00002 0.00001"/>
+    </body>
+
+    <!-- Camera -->
+    <body name="camera_obj" pos="0.8 0.2 0.46" euler="0 0 0.6">
+      <freejoint name="camera_obj_free"/>
+      <geom name="camera_vis" mesh="camera_visual" rgba="0.15 0.15 0.18 1" class="object_visual"/>
+      <geom name="camera_col_0" mesh="camera_col0" class="object_collision" rgba="0.15 0.15 0.18 0"/>
+      <geom name="camera_col_1" mesh="camera_col1" class="object_collision" rgba="0.15 0.15 0.18 0"/>
+      <inertial pos="0 0 0" mass="0.2" diaginertia="0.0001 0.0001 0.00005"/>
+    </body>
+
+    <!-- Mug -->
+    <body name="mug" pos="0.9 0 0.45">
+      <freejoint name="mug_free"/>
+      <geom name="mug_vis" mesh="mug_visual" rgba="0.3 0.5 0.7 1" class="object_visual"/>
+      <geom name="mug_col_0" mesh="mug_col0" class="object_collision" rgba="0.3 0.5 0.7 0"/>
+      <geom name="mug_col_1" mesh="mug_col1" class="object_collision" rgba="0.3 0.5 0.7 0"/>
+      <inertial pos="0 0 0.03" mass="0.3" diaginertia="0.0002 0.0002 0.0001"/>
+    </body>
+
+    <!-- Flashlight -->
+    <body name="flashlight" pos="0.6 0.25 0.46" euler="0 0 -0.8">
+      <freejoint name="flashlight_free"/>
+      <geom name="flashlight_vis" mesh="flashlight_visual" rgba="0.9 0.85 0.2 1" class="object_visual"/>
+      <geom name="flashlight_col_0" mesh="flashlight_col0" class="object_collision" rgba="0.9 0.85 0.2 0"/>
+      <inertial pos="0 0 0" mass="0.18" diaginertia="0.0001 0.0001 0.00005"/>
+    </body>
+
+    <!-- Stamp -->
+    <body name="stamp" pos="0.45 0.15 0.46" euler="0 0 1.1">
+      <freejoint name="stamp_free"/>
+      <geom name="stamp_vis" mesh="stamp_visual" rgba="0.6 0.4 0.25 1" class="object_visual"/>
+      <geom name="stamp_col_0" mesh="stamp_col0" class="object_collision" rgba="0.6 0.4 0.25 0"/>
+      <inertial pos="0 0 0" mass="0.08" diaginertia="0.00003 0.00003 0.00002"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="camera1" pos="0.6 0.0 1.8">
+      <camera name="camera1" fovy="50" pos="0 0 0" xyaxes="1 0 0 0 0 1"/>
+    </body>
+    <body name="camera2" pos="0.550 -1.473 1.462">
+      <camera name="camera2" fovy="60" pos="0 0 0" xyaxes="1.000 0.013 0.000 -0.008 0.612 0.791"/>
+    </body>
+    <body name="camera3" pos="0.615 1.473 1.024">
+      <camera name="camera3" fovy="60" pos="0 0 0" xyaxes="-1.000 0.017 0.000 -0.008 -0.438 0.899"/>
+    </body>
+
+    <!-- Keypoint markers -->
+    <body name="keypoint_markers" pos="0 0 0">
+      <site name="keypoint_0" pos="0 0 -10" size="0.01" rgba="1 0 0 0" type="sphere"/>
+      <site name="keypoint_1" pos="0 0 -10" size="0.01" rgba="1 0.2 0 0" type="sphere"/>
+      <site name="keypoint_2" pos="0 0 -10" size="0.01" rgba="1 0.4 0 0" type="sphere"/>
+      <site name="keypoint_3" pos="0 0 -10" size="0.01" rgba="1 0.6 0 0" type="sphere"/>
+      <site name="keypoint_4" pos="0 0 -10" size="0.01" rgba="1 0.8 0 0" type="sphere"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home" qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0  0 0 0 0 0 0 0 0  0.5 -0.25 0.46 1 0 0 0  0.55 -0.1 0.46 1 0 0 0  0.7 -0.15 0.46 1 0 0 0  0.75 0.05 0.46 1 0 0 0  0.8 0.2 0.46 1 0 0 0  0.9 0 0.45 1 0 0 0  0.6 0.25 0.46 1 0 0 0  0.45 0.15 0.46 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0  0"/>
+  </keyframe>
+</mujoco>

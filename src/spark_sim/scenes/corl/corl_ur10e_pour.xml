@@ -1,0 +1,143 @@
+<mujoco model="corl_ur10e_pour">
+  <!--
+    CoRL: pour task with UR10e + Robotiq 2F-85.
+    Adapted from corl_f1_pour.xml (Panda version).
+
+      - UR10e base at (-0.6, 0, 0.225), rotated 90deg to face +X.
+      - Table in front of robot (top at z=0.225).
+      - Plastic cup: cylindrical, 110mm tall, 70mm OD. On +Y side.
+      - Bowl: open shallow cylinder, 200mm OD, 80mm tall. On -Y side.
+      - Cameras: agentview, sideview, topview.
+
+    Trajectory:
+      Phase 1 (top-down hover above cup): joint move
+      Phase 2 (descend + close gripper on cup): joint move + ramp
+      Phase 3 (lift cup straight up): joint move
+      Phase 4 (transport to pre-pour hover over bowl): joint move
+      Phase 5 (tilt about local-X to pour): joint move
+      Phase 6 (un-tilt + retreat): joint move
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/universal_robots_ur10e/assets"/>
+
+  <include file="_ur10e_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0 0 0.5" extent="1.5"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="plastic_cup_mat" rgba="0.95 0.95 0.92 1"
+              specular="0.2" shininess="0.15" reflectance="0.05"/>
+    <material name="bowl_mat" rgba="0.35 0.45 0.7 1"
+              specular="0.6" shininess="0.4" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: top surface at z=0.225 to match UR10e base height -->
+    <body name="table" pos="0.1 0 0.215">
+      <geom name="table_top" type="box" size="0.45 0.40 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Plastic cup: 70mm OD, 110mm tall, mass 0.20 kg.
+      Placed on +Y side, upright. Bottom on table top (z=0.225);
+      centre z = 0.225 + 0.055 = 0.280.
+    -->
+    <body name="plastic_cup" pos="0.15 0.20 0.280">
+      <freejoint name="plastic_cup_free"/>
+      <geom name="plastic_cup_geom" type="cylinder" size="0.035 0.055"
+            material="plastic_cup_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0" mass="0.20"
+                diaginertia="0.00030 0.00030 0.00012"/>
+    </body>
+
+    <!--
+      Bowl: 200mm OD (100mm radius), 80mm tall (40mm half).
+      -Y side. Bottom on table top.
+      Centre z = 0.225 + 0.005 = 0.230.
+    -->
+    <body name="bowl" pos="0.15 -0.20 0.230">
+      <geom name="bowl_bottom" type="cylinder" size="0.1 0.005"
+            pos="0 0 0" material="bowl_mat"
+            condim="6" friction="0.9 0.4 0.001"/>
+      <!-- Octagonal wall: 8 box segments -->
+      <geom name="bowl_w0" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0975 0 0.0425" euler="0 0 1.5708"
+            material="bowl_mat"/>
+      <geom name="bowl_w1" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 0.0689 0.0425" euler="0 0 2.3562"
+            material="bowl_mat"/>
+      <geom name="bowl_w2" type="box" size="0.039 0.0025 0.0375"
+            pos="0 0.0975 0.0425" euler="0 0 3.1416"
+            material="bowl_mat"/>
+      <geom name="bowl_w3" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 0.0689 0.0425" euler="0 0 3.9270"
+            material="bowl_mat"/>
+      <geom name="bowl_w4" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0975 0 0.0425" euler="0 0 1.5708"
+            material="bowl_mat"/>
+      <geom name="bowl_w5" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 -0.0689 0.0425" euler="0 0 2.3562"
+            material="bowl_mat"/>
+      <geom name="bowl_w6" type="box" size="0.039 0.0025 0.0375"
+            pos="0 -0.0975 0.0425" euler="0 0 3.1416"
+            material="bowl_mat"/>
+      <geom name="bowl_w7" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 -0.0689 0.0425" euler="0 0 3.9270"
+            material="bowl_mat"/>
+      <site name="bowl_target" pos="0 0 0.05" size="0.08 0.08 0.001"
+            rgba="0 0 0 0" type="box"/>
+    </body>
+
+    <!-- ================================================================
+         CAMERAS
+         ================================================================ -->
+    <body name="cam_target" pos="0.15 0 0.25">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.2 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.15 -1.2 0.6">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.15 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <!-- UR10e home: 6 arm joints + 8 gripper joints + cup (7 free) = 21 qpos -->
+  <keyframe>
+    <key name="home"
+         qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0 0 0 0 0 0 0 0 0
+                0.15 0.20 0.280 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0 0"/>
+  </keyframe>
+</mujoco>

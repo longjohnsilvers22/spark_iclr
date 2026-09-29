@@ -1,0 +1,18 @@
+# Example per-machine overlay. Copy to configs/machines/<your-host>.yaml and
+# launch with `--machine <your-host>`; load_family_yaml deep-merges it over the
+# selected <family>_default.yaml. Machine overlays are gitignored (they hold
+# rig-specific IPs, camera serials, and calibration), so they never ship — only
+# this template does. Put anything host-specific here, not in the family default.
+
+robot:
+  family: "bimanual_franka"
+  # Per-arm controller IPs for YOUR rig (private range shown as a placeholder).
+  left_ip:  "172.16.0.101"
+  right_ip: "172.16.0.102"
+  # backend: "franky"   # or your validated per-rig motion backend
+
+# Camera serials for this host (Kinect/ZED/RealSense as applicable).
+# cameras:
+#   - role: "external"
+#     type: "zed_mini"
+#     serial: "REPLACE_WITH_YOUR_SERIAL"

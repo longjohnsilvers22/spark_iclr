@@ -1,0 +1,349 @@
+# Franka FR3 (Franka Research 3).
+# Mirrors the schema in configs/ur10e_default.yaml so the same loader code
+# can ingest either robot.  See docs/franka/README.md for upstream sources.
+
+robot:
+  ip: "172.16.0.2"     # FCI hostname / IP - update for your controller
+  frequency: 1000      # libfranka realtime callback runs at 1 kHz (informational)
+  # Lab-tuned home pose. Joint angles in radians,
+  # converted from the operator-chosen tabletop-ready configuration
+  # [0.6, -30.8, 0.0, -125.9, -1.1, 95.9, 45.7] degrees. Replaces the
+  # stock FR3 q_ready so the gripper starts above the work surface.
+  # Canonical Panda "ready" with J5 = -0.15 rad (~8.6 deg, barely visible).
+  # Tradeoff: J5 EXACTLY at 0 puts the FR3 wrist at its spherical
+  # singularity. libfranka then trips velocity_discontinuity on every
+  # teleop Cartesian-velocity tick from home, and FrankaDriver.send_velocity
+  # auto-recovers and suppresses each tick -> teleop appears completely
+  # frozen. A small -0.15 offset is enough to escape the singularity band
+  # (libfranka rejects |J5|<0.05; we also need a margin for the LM IK
+  # filter at |J5|<0.10) while staying visually nearly neutral.
+  home_config: [0.0, -0.785398, 0.0, -2.356194,
+                -0.15, 1.570796, 0.785398]
+
+  # URDF + mesh assets.  Generated from the upstream `franka_description`
+  # xacro (Apache-2.0, https://github.com/frankaemika/franka_description)
+  # at `~/spark/external/franka_description`.  Both URDF variants live
+  # under `robots/franka/urdf/` and contain absolute mesh paths so they
+  # load outside a ROS2 / ament environment.  See docs/franka/URDF.md
+  # for layout and regeneration instructions.
+  urdf:
+    # Default: FR3 + Franka Hand (stock parallel jaw gripper).  Use this
+    # for collision-aware planning, perception coordinate frames, and
+    # MoveIt2 / Pinocchio kinematics.
+    path: "robots/franka/urdf/fr3_franka_hand.urdf"
+    # Joint names in URDF order, matching the 7-vector emitted by
+    # FrankaDriver.get_joint_positions().
+    joint_names:
+      - fr3_joint1
+      - fr3_joint2
+      - fr3_joint3
+      - fr3_joint4
+      - fr3_joint5
+      - fr3_joint6
+      - fr3_joint7
+
+  # Motion limits.  These are *absolute* values for parity with the UR10e
+  # config; the driver shim translates them into franky's
+  # `relative_dynamics_factor` (a scalar in [0, 1]) at call time.
+  max_joint_velocity: 1.05        # rad/s  (FR3 hard limit ~2.62 rad/s)
+  max_linear_velocity: 0.25       # m/s    (FR3 hard limit ~1.7 m/s)
+
+  # franky-specific.  Range [0.0, 1.0].  Overrides per-call velocity scaling
+  # when set; leave commented-out to use the per-call translation.
+  # relative_dynamics_factor: 0.1
+
+gripper:
+  type: "franka_hand"     # Stock parallel jaw gripper.  Switch to "robotiq_2f85"
+                          # if a Robotiq is fitted via a flange adapter - not
+                          # yet wired in this shim.
+  # speed / force in SI units (m/s, N).  Default grasp tolerance is 5 mm.
+  speed: 0.10
+  # 70 N is the deployed default (FrankaDriverBase.GRIPPER_DEFAULT_FORCE)
+  # that has run on the hardware; the driver reads gripper.force.
+  force: 70.0
+  epsilon_inner: 0.005
+  epsilon_outer: 0.005
+  open_width: 0.08       # m, queried at runtime via gripper.max_width
+
+# Workspace safety bounds (meters, in robot base frame). Tune to the
+# actual cell once measured. FR3 has ~855 mm reach so the XY bounds are
+# generous; Z is the touchy one since the floor of the cell relative to
+# the robot's base z=0 plane depends on how the arm is mounted. Lower
+# z_min if you can't reach objects on the table; raise it back up once
+# you have a measured workspace.
+workspace:
+  x_min: -0.85
+  x_max: 0.85
+  y_min: -0.85
+  y_max: 0.85
+  z_min: -0.040   # at the calibrated tabletop level. The hard descent
+                  # stop is enforced by table_z_floor+3mm in grasping.py
+                  # (so we never actually hit the wood); the workspace
+                  # floor here just needs to be low enough that thin
+                  # handles (top surface around -0.025 to -0.031, after
+                  # the 5mm descent bias) aren't clipped above the
+                  # object. -0.040 matches table_z_floor exactly.
+  z_max: 1.20
+  # CBF gain on the workspace box: max velocity toward a bound is
+  # eta_kinematic * distance_to_bound. Higher = stays at full commanded
+  # speed deeper into the workspace and only ramps down in the last
+  # centimetre or two. 5.0 keeps tabletop manipulation crisp; lower if
+  # you want a wider soft-stop zone.
+  eta_kinematic: 5.0
+
+# T-shirt fold tuning (meters). Read by the cloth_fold primitive via
+# RobotProfile.cloth(); a per-call BT param overrides any value here, and
+# any key left unset falls back to the hardcoded primitive default. These
+# are the tuned single-arm Franka values (measured on fold runs).
+cloth:
+  sleeve_lift_h: 0.120        # sleeve arc lift height
+  body_lift_h: 0.080          # collar/body lift height
+  arc_peak: 0.030             # sinusoidal arc peak above the lift line
+  sleeve_past_center_m: 0.08  # fold the sleeve this far past shirt center Y
+  grasp_z: -0.02              # table level for thin fabric
+
+# Calibrated tabletop floor (robot base frame). ScoreExecutor uses
+# (table_z_floor + 2 mm) as the hard descent stop during grasp retries
+# so a thin-object close can engage the object's full thickness against
+# the table without driving the wrist into the foam.
+# Franka FR3 sits at table level here, so the foam is ~4 cm below z=0.
+table_z_floor: -0.025
+
+# Stack / place tuning (control/executor_core.py:_apply_family_tuning),
+# sourced from YAML rather than code literals. Franka's grasp uses the
+# legacy path (not grasp-v2), so no `grasp:` block is needed.
+stack:
+  # skills/manipulation.py picks the continuous send_velocity descent on ANY
+  # driver that exposes send_velocity, which every Franka backend now does, so
+  # the FR3 no longer runs the stepped path its step_m below was tuned for.
+  # A descent_mode switch belongs here once manipulation.py reads it before
+  # the hasattr(send_velocity) test; no reader exists yet, so no key either.
+  clearance_m: 0.12
+  max_descent_m: 0.15
+  contact_force_n: 5.0
+  hard_stop_delta_n: 20.0  # FR3 F/T is zeroed, so delta ~= its historical abs-fz stop
+  step_m: 0.002            # FR3's fine stepped-descent size
+  descent_vel_frac: 0.10
+
+# ScoreExecutor control toggles. Read at executor init via
+# _resolve_wrist_refine_flag(); any key left unset falls back to the
+# hardcoded executor default.
+control:
+  # Keep false: wrist hand-eye RMSE ~19.5mm; the wrist camera is video-only.
+  wrist_refine: false
+
+# Per-primitive wall-clock budgets (seconds), from the paper appendix.
+# Loaded once at ScoreExecutor init (control/primitive_timeouts.py) and
+# enforced at the dispatch choke point: when a primitive overruns its
+# budget the watchdog aborts the motion via executor.abort() (the /api/stop
+# path) and the failed result is routed into the EXISTING recovery layer,
+# exactly like a failed post-condition. It does NOT terminate the trial.
+# `default` covers any primitive not listed; `constrained_scrub` carries the
+# paper's `wipe` budget (and `wipe` is its planner-grammar alias).
+timeouts:
+  # UNTUNED on the FR3: the three values below are copied from
+  # ur10e_default.yaml. The paper-table budgets they replace (4.0 / 1.0 / 1.0)
+  # cannot hold the shared release path (franky Gripper.open at 0.1 m/s,
+  # RELEASE_OPEN_SETTLE_S, the retract, TILT_SETTLE_S when tilted) or a
+  # rebinding move_to_keypoint, so the watchdog aborted legitimate motions.
+  # Re-measure grasp and release wall-clock on the FR3 and tighten.
+  move_to_keypoint: 30.0
+  move_relative: 2.0
+  grasp: 25.0
+  release: 20.0
+  insert: 6.0
+  push_object: 4.0
+  open_drawer: 5.0
+  wipe: 10.0
+  constrained_scrub: 10.0
+  default: 8.0
+  # Generous budgets for the long composite primitives in this deployment's
+  # grammar (not in the paper's simple table). The 8.0s default would kill
+  # these legitimately-long skills mid-run, which violates the spec's "fast
+  # primitives behave identically under generous budgets" invariant; these
+  # entries keep the watchdog as a true-hang catch, not a premature abort.
+  grasp_se3: 90.0      # EquiGraspFlow cold start (~39s) + multi-step approach + retries
+  cloth_fold: 180.0    # full sleeve+hem fold sequence with re-detect
+  cloth_fold_single: 90.0
+  hem_press: 60.0
+  pants_fold: 180.0
+  sweep: 120.0         # multi-pass torque-controlled sweep
+  pour: 60.0           # hover + incremental tilt + vision-terminated pour (<=15s) + recover
+  place_in_slot: 60.0
+  search_keypoint: 60.0  # multi-loop search recovery primitive
+  retract_retry: 60.0    # multi-retry approach recovery primitive
+  # Long force/motion tool-use composites (multi-second descents, oscillation,
+  # writing, or an internal grasp_se3 sub-call).
+  sponge_wash: 150.0     # internally dispatches grasp_se3 then scrubs
+  rinse: 90.0
+  pour_to_level: 60.0
+  sweep_to_container: 120.0
+  constrained_scrub_oscillating: 60.0
+  compliant_insert: 60.0
+  pen_write: 120.0
+  throw_to: 30.0
+
+# Camera configuration.
+#
+# Wrist camera (RealSense D435I) is **optional**.  Leaving this field
+# unset (or null) triggers auto-detection: the pipeline enumerates
+# pyrealsense2 devices at startup and opens the wrist cam iff one is
+# physically connected.  Set to `false` to force-disable even when a
+# device is plugged in, or `true` to require one (init will warn if
+# absent).  After mounting the bracket: measure the camera-to-TCP
+# transform and set `wrist_tool_offset_xyz` below.  Until then the
+# placeholder default in pipeline.py (Franka family -> [0.00, 0.06,
+# -0.05]) is used and a warning is logged at startup.
+
+# Dual Kinect hardware sync.  When the 3.5mm sync cable is connected
+# between the two Kinects' SYNC IN/OUT ports, set this to true: master
+# triggers subordinate, only one stream's worth of bandwidth per cable
+# rather than two free-running cameras competing on the same USB host.
+# Master serial is `kinect_master_serial` in pipeline.py's PipelineConfig.
+# Verified with a standalone pyk4a test: the subordinate (birdview) is
+# trigger-gated and runs paired captures at a steady 66.7 ms once the master
+# fires.
+kinect_use_hw_sync: true
+# Master Kinect serial for wired hw-sync on this FR3 host: the sideview
+# unit (000000000000, _kinect). Mirrors the cameras[] sideview entry and
+# PipelineConfig.kinect_master_serial. server.py reads this key first and
+# only falls back to the baked-in FR3 literal if it is missing.
+kinect_master_serial: "000000000000"
+
+# Kinect stream mode. All three keys are EXPLICIT so this file, server.py's
+# early open path and PipelineConfig agree; the PipelineConfig defaults they
+# mirror are WFOV_2X2BINNED / 720P / 15 (see pipeline_types.py and
+# docs/MULTICAM_CRASH_MECHANISM.md).
+#   kinect_depth_mode: WFOV_2X2BINNED  (120 deg FOV, 512x512, 0.25-2.88 m range)
+#   kinect_resolution: 720P            (RGB color stream)
+#   kinect_fps: 15                     (depth + color frame rate)
+# Other valid depth modes: NFOV_UNBINNED, NFOV_2X2BINNED, WFOV_UNBINNED
+# (the latter caps at 15 fps in hardware).
+kinect_depth_mode: WFOV_2X2BINNED
+# 720P: the SDK reports per-resolution intrinsics so hand-eye stays valid.
+# 1080P/15 is within the USB preflight budget; set 1080P here only after
+# confirming it on the FR3 host.
+kinect_resolution: 720P
+# 15 fps halves the per-Kinect isochronous USB load. Both Kinects plus the
+# wrist RealSense share the single PCH xHCI controller on this host, and a
+# silent host freeze is suspected to be that controller wedging.
+# Detection is snapshot-based so the pipeline does not need 30 fps.
+kinect_fps: 15
+
+# Role-keyed camera roster read by perception/camera_registry.py.
+#
+# Each entry carries a `role` (the registry key every downstream user
+# looks cameras up by) and a `type` dispatched by the builder:
+#   kinect    -> AzureKinectCamera  (Azure Kinect DK, dual external)
+#   realsense -> RealSenseCamera    (Intel D435I wrist cam)
+#   zed_mini  -> ZEDMiniCamera      (bimanual external only)
+#
+# The two external Kinects keep their slot mapping:
+#   sideview = master  (kinect_master_serial 000000000000, _kinect)
+#   birdview = subordinate (000000000000, _kinect2)
+# The serials below mirror the SDK-level master/sub config at the top of
+# this file; the top-level kinect_* fields stay authoritative for the
+# live open path (sync mode, depth mode, retry), so these entries are the
+# config-driven roster, not a second open path.
+cameras:
+  - role: "birdview"
+    type: "kinect"
+    serial: "000000000000"   # subordinate Kinect (bird view, _kinect2)
+    sync: "subordinate"
+  - role: "sideview"
+    type: "kinect"
+    serial: "000000000000"   # master Kinect (side view, _kinect); matches kinect_master_serial
+    sync: "master"
+  - role: "wrist"
+    type: "realsense"
+    serial: ""               # auto-detect the single plugged-in D435I
+    width: 640
+    height: 480
+    enabled: false           # auto-detected at startup; flip true once mounted
+
+# Behavior-tree cache (spark_real/bt_library.py). The packaged seeds under
+# configs/bt_seeds were captured on the UR10e and carry Robotiq gripper
+# numbers (force, target_width) with no family tag; installing them here
+# would let plan_mode "auto" serve a UR tree to the Franka hand instead of
+# planning. Keep seeding OFF for this family.
+bt:
+  seed_on_start: false
+
+# The blocks below spell out the code defaults so a change to a code default
+# does not silently change this rig; see the reader named on each block.
+
+# Task-success verification (control/success_verifier.py VerifyConfig,
+# control/verify_scope.py ScopeConfig, control/executor_verify.py).
+verification:
+  enabled: true
+  min_conf: 0.35
+  require_two_views: false
+  inside_xy_margin_m: -0.02
+  inside_z_tol_m: 0.06
+  fallback_2d_containment: 1.01   # > 1.0 = the image-space fallback abstains
+  on_missing: unverified
+  # A verified failure is logged, not corrected: the replay opens the
+  # gripper and moves the arm, so it stays opt-in. retry_max_attempts is
+  # left to the code default (2, or 1 under --strict-verify).
+  retry_on_fail: false
+  scope:
+    enabled: true
+    telemetry_short_circuit: true
+    reuse_capture_s: 0.0
+    anchor_references: false
+    condition_anchor_references: true
+    fusion: false
+    cameras: auto
+  release_verdict: false          # control/execution_recovery.release_verdict_enabled
+  attribution: false              # control/execution_recovery.attribution_enabled
+
+# Per-primitive traces (control/primitive_trace.py TraceWriter).
+trace:
+  enabled: true
+  save_images: false
+
+# Place-time release height (control/executor_motion._release_giveback_enabled).
+place:
+  release_giveback: false
+
+# Detection conditioning (control/execution_recovery rebind_settings /
+# sticky_settings, pipeline_perception._fusion_settings).
+perception:
+  rebind:
+    enabled: true                 # re-detect the bound label before every approach
+    log_drift_cm: 2.0
+  sticky:
+    enabled: false                # gated re-detect adoption; distances are sim-tuned
+    gate_m: 0.12
+    ambiguity_sep_m: 0.03
+    dedup_radius_m: 0.02
+  fusion:
+    enabled: false                # second-opinion detector gate stays off
+
+# VLA policy settings (unchanged from UR10e - VLA chunk semantics are
+# robot-agnostic at this layer; the driver translates joint chunks).
+vla:
+  policy_type: "pi05"
+  control_frequency: 10
+  action_horizon: 16
+
+# Franka-specific safety thresholds passed to libfranka via
+# Robot.set_collision_behavior (not invoked automatically - call the upstream
+# bindings from the bring-up script if you want non-default thresholds).
+# Upstream: include/franky/robot.hpp setCollisionBehavior overloads.
+#
+# Flat 100 Nm / 100 N (Deoxys/Bamboo standard). A tuned 6-10 Nm / 10-12.5 N
+# set made normal accel transients trip reflexes (16 aborts + 21 recoveries
+# per silverware run, 45.9s -> 332s). Tighten again only with hardware
+# validation (contact tasks: cloth, pour, scrub).
+collision_behavior:
+  # Per-joint torque thresholds (Nm) for upper/lower acceleration limits.
+  joint_torque_acc_lower: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  joint_torque_acc_upper: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  joint_torque_nom_lower: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  joint_torque_nom_upper: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  # Cartesian force/torque thresholds at the EE (N, N, N, Nm, Nm, Nm).
+  cartesian_force_acc_lower: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  cartesian_force_acc_upper: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  cartesian_force_nom_lower: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+  cartesian_force_nom_upper: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]

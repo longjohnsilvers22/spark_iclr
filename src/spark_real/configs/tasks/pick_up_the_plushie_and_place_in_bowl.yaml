@@ -1,0 +1,26 @@
+# "pick up the plushie and place in bowl" -- 49 human episodes.
+#
+# Scene (verified against camera_1/frame_0000): one multicoloured
+# purple/orange plushie at table-left, one pale blue bowl to its right.
+# Both are high-contrast against the grey table; this is the easiest task
+# in the corpus for perception and a good first end-to-end shakedown.
+task: "pick up the plushie and place in bowl"
+aliases:
+  - "pick up the plushie and place it in the bowl"
+  - "put the plushie in the bowl"
+  - "place the plushie in the bowl"
+
+groups:
+  - text: "plushie"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["stuffed animal", "stuffed toy", "plush toy"]
+
+  - text: "bowl"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["blue bowl"]
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

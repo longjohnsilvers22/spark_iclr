@@ -1,0 +1,31 @@
+# "stack the gray block on the blue block" -- 48 human episodes.
+#
+# The mirror of stack_the_blue_block_on_the_gray_block. Same scene, same
+# prompts, same expected counts; the pick/place roles swap in the BT.
+#
+# These two instructions tokenize to the same bag of words, so a Jaccard
+# score can never tell them apart. Registry.lookup handles that by taking
+# the exact/alias hit first and by refusing a near-tie on the fuzzy path
+# rather than picking one arbitrarily. Keep the alias lists disjoint.
+task: "stack the gray block on the blue block"
+aliases:
+  - "put the gray block on the blue block"
+  - "place the gray block on top of the blue block"
+  - "stack the grey block on the blue block"
+
+per_instance_z: true
+
+groups:
+  - text: "blue block"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["blue cube"]
+
+  - text: "gray block"
+    expect: {min: 1, max: 1}
+    min_conf: 0.15
+    alt_prompts: ["white block", "grey block", "light gray block", "gray cube"]
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

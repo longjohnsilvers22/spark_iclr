@@ -1,0 +1,46 @@
+# Task 6 of the human-parity demo set: "stack the blocks of same color".
+#
+# Scene: two blue blocks and two gray blocks. Goal: blue on blue AND gray
+# on gray. One tree handles ONE pair; the second pair is picked up by the
+# closed-loop outer pass (config.max_task_passes > 1), which re-perceives
+# and re-runs this same cached tree against whatever is still unstacked.
+instruction: "stack the blocks of same color"
+aliases:
+  - "stack the blocks of the same color"
+  - "stack the same colored blocks"
+  - "stack the blocks of same colour"
+  - "stack the blocks by color"
+objects: ["blue block 1", "blue block 2", "gray block 1", "gray block 2"]
+priority: 10
+promote: true
+verified: false
+provenance: >-
+  Captured from live-run library entry c433c63a3565 ("pick up the blue
+  block and stack it on the other blue block", success=2 fail=0) -- the
+  strongest same-colour stack in the library. The tree is unmodified; only
+  the instruction it is filed under differs.
+notes: >-
+  verified:false because the seeded tree completes ONE pair, while the
+  human task string implies both. Requires (a) max_task_passes >= 2 so the
+  closed loop re-runs it for the gray pair, and (b) IMPL-SAM3's
+  flatten_instance_z:false for this task -- with Z flattened to the median,
+  the block already on top of a stack reports the same height as the one
+  below it and the second pass re-picks the wrong block. Confirm both
+  before batching this task.
+score:
+  task: "stack the blocks of same color"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "blue block 2", offset_z: 0.0}
+      - type: grasp
+        params: {force: 60, target_width: 0.03}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: stack
+        params:
+          target_label: "blue block 1"
+          force_threshold: 15.0
+          max_descent: 0.25
+          clearance: 0.05

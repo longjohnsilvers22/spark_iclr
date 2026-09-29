@@ -1,0 +1,165 @@
+<mujoco model="corl_f3_sponge_with_soap">
+  <!--
+    CoRL F3+: dish-washing demo — soap pour + sponge scrub.
+      - Panda arm at world origin (table in front).
+      - Soap bottle: green/blue dish-soap style, ~180mm tall, ~50mm OD body.
+        Placed at (0.65, -0.20) on the -Y side, away from sponge and plate.
+        Body: 25mm radius x 120mm tall, shoulder taper: 18mm radius x 20mm,
+        neck: 12mm radius x 20mm, nozzle cap: 15mm radius x 10mm.
+        Total height = 120 + 20 + 20 + 10 = 170mm (close to 180).
+      - Sponge: yellow block 100mm x 60mm x 30mm, at (0.50, 0.20).
+      - Plate: 200mm OD, 12mm tall, at (0.50, 0.00). Welded.
+      - Cameras: agentview, sideview, topview.
+
+    Task sequence the test exercises:
+      1.  top-down grasp soap bottle
+      2.  lift to safe ceiling
+      3.  translate above plate
+      4.  tilt 50 deg to pour soap onto plate (hold 2s)
+      5.  untilt, translate back, place bottle
+      6.  top-down grasp sponge
+      7.  transit to plate
+      8.  4-stroke +/-4cm scrub
+      9.  lift, retreat
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.5 0 0.5" extent="1.3"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="soap_body_mat" rgba="0.10 0.50 0.65 1"
+              specular="0.5" shininess="0.35" reflectance="0.15"/>
+    <material name="soap_label_mat" rgba="0.15 0.60 0.30 1"
+              specular="0.3" shininess="0.20" reflectance="0.08"/>
+    <material name="soap_cap_mat" rgba="0.85 0.85 0.88 1"
+              specular="0.7" shininess="0.5" reflectance="0.2"/>
+    <material name="sponge_mat" rgba="1.0 0.85 0.15 1"
+              specular="0.05" shininess="0.05" reflectance="0.02"/>
+    <material name="plate_mat" rgba="0.95 0.95 0.97 1"
+              specular="0.7" shininess="0.6" reflectance="0.3"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: same convention as other CoRL scenes, top at z=0 -->
+    <body name="table" pos="0.55 0 -0.01">
+      <geom name="table_top" type="box" size="0.45 0.45 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Soap / detergent bottle: dish-soap style.
+        body:     25mm radius x 120mm tall  (z 0..120)
+        shoulder: 18mm radius x 20mm tall   (z 120..140)  — taper
+        neck:     12mm radius x 20mm tall   (z 140..160)
+        cap:      15mm radius x 10mm tall   (z 160..170)
+      Total height = 170mm.  Bottom on table; body origin at table level.
+      Grasp target (top-down) = cap top z = 0.170, grip the neck at z ~0.150.
+      Mass = 0.25 kg (half-full soap bottle).
+      Placed at (0.65, -0.20): -Y side, shifted +X to avoid plate.
+    -->
+    <body name="soap_bottle" pos="0.65 -0.20 0.0">
+      <freejoint name="soap_free"/>
+      <!-- Main body: squat cylinder -->
+      <geom name="soap_body" type="cylinder" size="0.025 0.060"
+            pos="0 0 0.060" material="soap_body_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Label band (visual accent) -->
+      <geom name="soap_label" type="cylinder" size="0.0255 0.025"
+            pos="0 0 0.055" material="soap_label_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Shoulder taper -->
+      <geom name="soap_shoulder" type="cylinder" size="0.018 0.010"
+            pos="0 0 0.130" material="soap_body_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Neck -->
+      <geom name="soap_neck" type="cylinder" size="0.012 0.010"
+            pos="0 0 0.150" material="soap_body_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Nozzle cap -->
+      <geom name="soap_cap" type="cylinder" size="0.015 0.005"
+            pos="0 0 0.165" material="soap_cap_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0.070" mass="0.25"
+                diaginertia="0.00060 0.00060 0.00020"/>
+    </body>
+
+    <!--
+      Sponge: 100mm x 60mm x 30mm, long axis along Y.
+      At (0.50, 0.20) on +Y side.  Centre z = 0.015.
+    -->
+    <body name="sponge" pos="0.50 0.20 0.015">
+      <freejoint name="sponge_free"/>
+      <geom name="sponge_geom" type="box" size="0.03 0.05 0.015"
+            material="sponge_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0" mass="0.08"
+                diaginertia="0.0001 0.00008 0.00012"/>
+    </body>
+
+    <!--
+      Plate: 200mm OD, 12mm tall. Welded (no freejoint).
+      Centre at (0.50, 0.00).
+    -->
+    <body name="plate" pos="0.50 0.00 0.0">
+      <geom name="plate_geom" type="cylinder" size="0.10 0.006"
+            pos="0 0 0.006" material="plate_mat"
+            condim="6" friction="0.9 0.4 0.001"/>
+      <site name="plate_centre" pos="0 0 0.013" size="0.005" rgba="0 1 0 0"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="cam_target" pos="0.55 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.55 0.0 0.9">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.55 -1.2 0.45">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.55 0 1.6">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <!-- qpos order: 7 arm + 2 finger + 7 soap_free + 7 sponge_free = 23 -->
+  <keyframe>
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785 0.04 0.04  0.65 -0.20 0.0 1 0 0 0  0.50 0.20 0.015 1 0 0 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785 255"/>
+  </keyframe>
+</mujoco>

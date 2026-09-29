@@ -1,0 +1,3 @@
+[submodule "src/EquiGraspFlow"]
+	path = src/EquiGraspFlow
+	url = https://github.com/bdlim99/EquiGraspFlow.git

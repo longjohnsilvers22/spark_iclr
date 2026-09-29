@@ -1,0 +1,48 @@
+# Dustpan sweep task -- UR10e + Robotiq 2F-85
+# Sweep debris into the dustpan using the brush.
+# Objects: brush (handle + bristles), dustpan (open-top container),
+#          debris_1..debris_6 (small cubes scattered on table).
+#
+# Note: this YAML corresponds to the BT the planner would produce for
+# the real UR10e. The sim test (run_dustpan_ur10e.py) drives the
+# StandaloneMuJoCoSim directly (legacy UR10e path) and uses a weld
+# constraint to maintain brush grasp during sweep -- the production
+# real-robot path uses the sweep primitive from primitives.py instead.
+task: sweep the debris into the dustpan using the brush
+tree:
+  type: sequence
+  children:
+    # 1. Move above brush, open gripper
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "brush"
+        offset_x: 0
+        offset_y: 0
+        offset_z: 0.10
+    # 2. Descend to brush handle center
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "brush"
+        offset_x: 0
+        offset_y: 0
+        offset_z: 0.0
+    # 3. Grasp the brush handle (top-down)
+    - type: grasp
+      params:
+        force: 80
+    # 4. Lift brush
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    # 5. Sweep debris into dustpan (5 passes)
+    - type: sweep
+      params:
+        area_label: "debris"
+        target_label: "dustpan"
+        n_passes: 5
+        sweep_height_m: 0.005
+    # 6. Retreat: lift up
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.15}
+    # 7. Release brush
+    - type: release
+      params: {}

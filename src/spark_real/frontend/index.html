@@ -1,0 +1,3419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPARK</title>
+<style>
+:root {
+  --bg-0: #080c10;
+  --bg-1: #0c1018;
+  --bg-2: #111820;
+  --bg-3: #182030;
+  --border: #1c2636;
+  --border-hi: #283848;
+  --tx-1: #c8d0d8;
+  --tx-2: #6a7888;
+  --tx-3: #3a4858;
+  --cyan: #5b8dbe;
+  --cyan-15: rgba(91,141,190,.12);
+  --cyan-30: rgba(91,141,190,.30);
+  /* Single accent, overridden per connected robot below. */
+  --accent: #5b8dbe;
+  --red: #f04040;
+  --red-15: rgba(240,64,64,.12);
+  --green: #30c060;
+  --amber: #d4a020;
+  --amber-15: rgba(212,160,32,.12);
+  --blue: #4090f0;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r: 5px;
+  --fast: .15s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg-0);color:var(--tx-1);font:14px/1.5 var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+/* ---- GRID ---- */
+/* Two rows: 44px top bar, then the main grid takes the rest. */
+#app{display:grid;grid-template-rows:44px 1fr;height:100vh}
+
+
+/* Per-family palette. We pick CSS-friendly hues distinct enough to read at
+   a glance: indigo / teal / amber / magenta. Banner colour comes from these vars. */
+body.robot-franka{--rb-bg:#1a1840;--rb-fg:#b9b6ff;--rb-fg-2:#8a86d0;--rb-border:#3a3680;--accent:#b9b6ff}
+body.robot-ur10e {--rb-bg:#0e2a2a;--rb-fg:#7fe7d9;--rb-fg-2:#4fb8a9;--rb-border:#1f5755;--accent:#7fe7d9}
+body.robot-g1    {--rb-bg:#2a1c08;--rb-fg:#f0c060;--rb-fg-2:#b88a30;--rb-border:#5c3e10;--accent:#f0c060}
+body.robot-bimanual_franka{--rb-bg:#1a0a2a;--rb-fg:#e8a0ff;--rb-fg-2:#b070d0;--rb-border:#4a1a6a;--accent:#e8a0ff}
+
+/* Per-family control swap.
+   Mechanism: each `.only-<family>` element is hidden whenever the body
+   does NOT carry the matching `.robot-<family>` class. Elements tagged
+   with multiple `.only-*` classes (e.g. `.only-franka.only-ur10e` for
+   parallel-gripper controls shared by both) stay visible while ANY of
+   their families is active, selectors below only fire on element/body
+   pairs where NEITHER family is active. */
+body:not(.robot-franka) .only-franka:not(.only-ur10e):not(.only-g1):not(.only-bimanual_franka){display:none !important}
+body:not(.robot-ur10e)  .only-ur10e:not(.only-franka):not(.only-g1):not(.only-bimanual_franka){display:none !important}
+body:not(.robot-g1)     .only-g1:not(.only-franka):not(.only-ur10e):not(.only-bimanual_franka){display:none !important}
+body:not(.robot-bimanual_franka) .only-bimanual_franka:not(.only-ur10e):not(.only-franka):not(.only-g1){display:none !important}
+body:not(.robot-franka):not(.robot-ur10e) .only-franka.only-ur10e:not(.only-bimanual_franka){display:none !important}
+body:not(.robot-franka):not(.robot-g1)    .only-franka.only-g1:not(.only-bimanual_franka){display:none !important}
+body:not(.robot-ur10e):not(.robot-g1)     .only-ur10e.only-g1:not(.only-bimanual_franka){display:none !important}
+/* Single-arm omnibus class hides the entire single-arm teleop block on bimanual. */
+body.robot-bimanual_franka .only-singlearm{display:none !important}
+
+/* TM-bag (Pokemon-style learned-primitives popup). Retro framing. */
+.tm-menu{position:fixed;inset:auto 20px 20px auto;width:340px;max-height:70vh;
+  background:#141828;
+  border:1px solid #3a3680;border-radius:10px;padding:14px 14px 12px;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:1000;overflow-y:auto;
+  font:500 11px var(--mono)}
+.tm-menu h4{margin:0 0 10px;color:#b9b6ff;font:600 13px var(--mono);
+  text-align:center;border-bottom:1px solid #2c2a50;padding-bottom:6px}
+.tm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.tm-slot{background:rgba(255,255,255,.04);border:1px solid #2c2a50;border-radius:4px;
+  padding:6px 8px;cursor:pointer;transition:.15s}
+.tm-slot:hover{border-color:#8a86d0;background:rgba(138,134,208,.08)}
+.tm-slot.learned{border-color:#4a7a72}
+.tm-slot.locked{opacity:.45;cursor:not-allowed}
+.tm-slot .name{color:#b9b6ff;font:600 11px var(--mono)}
+.tm-slot .meta{color:var(--tx-3);font:400 9px var(--mono);margin-top:2px}
+.tm-close{position:absolute;top:8px;right:10px;background:transparent;border:0;
+  color:var(--tx-2);cursor:pointer;font-size:14px}
+
+/* Top bar */
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--bg-1);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand b{font:600 14px var(--mono);letter-spacing:.02em;color:var(--cyan)}
+.brand .sep{width:1px;height:16px;background:var(--border-hi)}
+.brand small{font:600 10px var(--mono);color:var(--tx-3)}
+.chips{display:flex;gap:8px;align-items:center}
+.chips-label{font:600 11px var(--mono);color:var(--tx-2);margin-right:2px}
+.chip{display:flex;align-items:center;gap:5px;font:500 11px var(--sans);color:var(--tx-2);padding:3px 9px;background:var(--bg-2);border-radius:14px}
+/* Connection status is conveyed by chip colour, no LED dots in the header.
+   The hidden .dot spans stay as the JS status hook (setDot toggles on/off). */
+.dot{display:none}
+.chip:has(.dot.on){color:var(--green)}
+.chip:has(.dot.off){opacity:.45}
+
+/* Main */
+.main{display:grid;grid-template-columns:1fr 380px;overflow:hidden}
+
+/* LEFT: viewport */
+.viewport-wrap{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+
+/* Toolbar above camera */
+.cam-toolbar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--bg-1);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
+.cam-toolbar .left,.cam-toolbar .right{display:flex;align-items:center;gap:6px}
+.cam-select{font:500 11px var(--sans);background:var(--bg-2);color:var(--tx-1);border:0;border-radius:var(--r);padding:4px 8px;outline:none;cursor:pointer}
+.cam-select:focus{outline:2px solid var(--accent)}
+.mode-btn{font:500 11px var(--sans);padding:4px 9px;background:var(--bg-2);border:0;border-radius:var(--r);color:var(--tx-2);cursor:pointer;transition:var(--fast)}
+.mode-btn:hover{background:var(--bg-3);color:var(--tx-1)}
+.mode-btn.active{background:var(--accent);color:var(--bg-0)}
+.mode-label{font:500 10px var(--mono);color:var(--tx-3)}
+
+/* Canvas viewport */
+.viewport{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
+.viewport canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.viewport img{width:100%;height:100%;object-fit:contain;-webkit-user-drag:none;user-select:none}
+/* Anchor calibration mode: force a precise crosshair over the camera
+   viewport so the operator gets pixel-accurate feedback when clicking
+   the gripper tip. !important wins over any inline cursor set by the
+   zoom/pan handlers. */
+body.anchor-mode .viewport,
+body.anchor-mode .viewport img,
+body.anchor-mode #cam-img{cursor:crosshair !important}
+.viewport .empty{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--tx-3);font:400 12px var(--mono)}
+.viewport .empty svg{width:36px;height:36px;stroke:var(--tx-3);fill:none;stroke-width:1.5}
+.cam-tag{position:absolute;top:8px;left:8px;font:600 10px var(--mono);padding:2px 7px;background:rgba(0,0,0,.65);border:1px solid var(--border-hi);border-radius:3px;color:var(--cyan)}
+.cam-ts{position:absolute;bottom:8px;right:8px;font:400 10px var(--mono);color:var(--tx-3);background:rgba(0,0,0,.6);padding:1px 6px;border-radius:2px}
+.click-hint{position:absolute;bottom:8px;left:8px;font:400 10px var(--mono);color:var(--tx-3);background:rgba(0,0,0,.6);padding:2px 8px;border-radius:3px}
+
+/* Detection strip */
+.det-strip{background:var(--bg-2);border-top:1px solid var(--border);padding:8px 12px;max-height:140px;overflow-y:auto;flex-shrink:0}
+.det-strip-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.det-strip-head h4{font:600 11px var(--mono);color:var(--tx-3)}
+.det-count{font:500 11px var(--mono);color:var(--accent);padding:1px 6px;border-radius:8px}
+.det-items{display:flex;flex-wrap:wrap;gap:5px}
+.det-x{margin-left:6px;cursor:pointer;opacity:.45;font-size:12px;padding:0 2px;border-radius:3px}
+    .det-x:hover{opacity:1;background:#5a2020;color:#fdd}
+    .det-chip{display:flex;align-items:center;gap:5px;padding:4px 9px;background:var(--bg-3);border-radius:var(--r);font-size:11px;transition:var(--fast)}
+.det-chip:hover{background:var(--border-hi)}
+.det-swatch{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.det-name{font:500 12px var(--mono);color:var(--tx-1)}
+.det-conf{font:400 10px var(--mono);color:var(--tx-3)}
+.det-pos{font:400 9px var(--mono);color:var(--tx-2)}
+
+/* RIGHT: panels */
+.panels{display:flex;flex-direction:column;overflow:hidden;background:var(--bg-1)}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:8px 0;font:600 11px var(--mono);color:var(--tx-3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:var(--fast);text-align:center}
+.tab:hover{color:var(--tx-2)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Tab panes */
+.pane{flex:1;overflow-y:auto;padding:14px;display:none}
+.pane.on{display:block}
+
+/* Sections */
+.sec{margin-bottom:18px}
+/* Section headers: sans, a touch larger, no underline rule. */
+.sec-h{font:600 13px var(--sans);color:var(--tx-1);margin-bottom:9px}
+
+/* Inputs */
+input[type="text"],textarea,select{width:100%;padding:8px 10px;background:var(--bg-0);border:0;border-radius:var(--r);color:var(--tx-1);font:400 12px var(--sans);outline:none;transition:var(--fast)}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+textarea{resize:vertical;min-height:50px;font-family:var(--mono)}
+.irow{display:flex;gap:6px;margin-bottom:8px}
+.irow input{flex:1}
+label{display:block;font:500 11px var(--sans);color:var(--tx-2);margin-bottom:4px}
+
+/* Buttons — flat fills, no borders or translucent tints. Default is a quiet
+   surface; the one accent (--accent, keyed to the connected robot) marks the
+   single primary action; red is reserved for stop/danger only. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;font:500 12px var(--sans);border:0;border-radius:var(--r);cursor:pointer;transition:var(--fast);background:var(--bg-3);color:var(--tx-1);white-space:nowrap}
+.btn:hover{background:var(--border-hi)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+.btn-p{background:var(--accent);color:var(--bg-0);font-weight:600}
+.btn-p:hover{background:var(--accent);filter:brightness(1.12)}
+.btn-d{background:transparent;color:var(--red);box-shadow:inset 0 0 0 1px rgba(240,64,64,.4)}
+.btn-d:hover{background:var(--red);color:var(--bg-0)}
+.btn-w{background:var(--bg-3);color:var(--amber)}
+.btn-w:hover{background:var(--border-hi)}
+.btn-s{padding:4px 8px;font-size:11px}
+.btn-f{width:100%}
+.brow{display:flex;flex-direction:column;gap:6px}
+
+/* Prompt tags */
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{display:flex;align-items:center;gap:3px;padding:3px 9px;background:var(--bg-3);border-radius:12px;font:500 11px var(--sans);color:var(--tx-1)}
+.tag .x{cursor:pointer;opacity:.6;font-size:13px;line-height:1}
+.tag .x:hover{opacity:1}
+
+/* Pipeline steps */
+.steps{display:flex;gap:2px;margin-bottom:14px}
+.step{flex:1;padding:5px 2px;text-align:center;font:500 10px var(--mono);color:var(--tx-3);background:var(--bg-0);border-radius:3px;transition:var(--fast)}
+.step.act{background:var(--bg-3);color:var(--accent)}
+.step.ok{background:rgba(48,192,96,.08);color:var(--green)}
+
+/* Plan display */
+.plan-box{background:var(--bg-0);border-radius:var(--r);padding:10px;font:400 11px/1.7 var(--mono);color:var(--tx-2);white-space:pre-wrap;max-height:260px;overflow-y:auto}
+.plan-box .k{color:var(--blue)}
+.plan-box .v{color:var(--cyan)}
+.plan-box .s{color:var(--amber)}
+
+/* Log */
+.log{background:var(--bg-0);border-radius:var(--r);padding:9px;font:400 11px/1.7 var(--mono);color:var(--tx-2);max-height:100%;overflow-y:auto}
+.log-e{display:flex;gap:6px;padding:1px 0}
+.log-t{color:var(--tx-3);flex-shrink:0}
+.log-m{word-break:break-word}
+.log-m.ok{color:var(--green)}
+.log-m.err{color:var(--red)}
+.log-m.inf{color:var(--blue)}
+.log-m.acc{color:var(--cyan)}
+
+/* History */
+.hist{padding:7px 9px;background:var(--bg-2);border-radius:var(--r);margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.hist-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.hist-dot.ok{background:var(--green)}
+.hist-dot.fail{background:var(--red)}
+.hist-body{flex:1;min-width:0}
+.hist-instr{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-meta{font:400 10px var(--mono);color:var(--tx-3)}
+
+/* Jog */
+.jog-wrap{display:flex;align-items:center;gap:16px;justify-content:center}
+.jog-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,38px);gap:3px;max-width:160px}
+.jog-grid .btn{padding:0;font-size:15px}
+.jog-z{display:flex;flex-direction:column;align-items:center;gap:3px}
+.jog-label{font:500 10px var(--mono);color:var(--tx-3);text-align:center;margin-bottom:4px}
+
+/* Robot connection progress */
+.conn-progress{display:none;margin-top:8px}
+.conn-bar{height:3px;background:var(--bg-0);border-radius:2px;overflow:hidden}
+.conn-fill{height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .3s ease}
+.conn-msg{font:400 10px var(--mono);color:var(--tx-2);margin-top:4px;text-align:center}
+
+/* Toast */
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);padding:8px 18px;background:var(--bg-3);border:1px solid var(--border-hi);border-radius:var(--r);font:500 11px var(--mono);color:var(--tx-1);z-index:999;opacity:0;transition:all .25s ease;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+
+/* Misc */
+.empty-msg{text-align:center;padding:24px;color:var(--tx-3);font:400 11px var(--mono)}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border-hi);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .2s ease forwards}
+
+/* Key indicators */
+.key-ind{display:inline-flex;flex-direction:column;align-items:center;gap:1px;
+  min-width:32px;padding:5px 6px;background:var(--bg-3);
+  border-radius:4px;font:600 12px var(--mono);color:var(--tx-2);transition:.1s ease}
+.key-ind.jog-btn{cursor:pointer;user-select:none;-webkit-user-select:none}
+.key-ind.jog-btn:hover{background:var(--border-hi);color:var(--tx-1)}
+.key-ind.jog-btn:active{background:var(--accent);color:var(--bg-0);transform:scale(.93)}
+.key-ind small{font:400 9px var(--mono);color:var(--tx-3)}
+.key-ind.pressed{background:var(--accent);color:var(--bg-0);transform:scale(.93)}
+/* Live indicator */
+.live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-right:4px}
+/* Record-trial button */
+.btn-record .rec-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px;vertical-align:middle;flex-shrink:0}
+.btn-record.recording{background:var(--red-15);border-color:var(--red);color:var(--red)}
+.btn-record.recording .rec-dot{background:var(--red)}
+/* Activity status pill (Idle / Capturing / Detecting / Planning / Executing) */
+.activity-pill{font-weight:600;transition:all .2s ease}
+.activity-pill .activity-dot{display:none}
+.activity-pill.idle{background:var(--bg-2);color:var(--tx-3);border-color:var(--border)}
+.activity-pill.thinking{background:rgba(64,144,240,.12);color:var(--blue);border-color:rgba(64,144,240,.4)}
+.activity-pill.executing{background:rgba(48,192,96,.15);color:var(--green);border-color:var(--green)}
+
+@media(max-width:900px){
+  .main{grid-template-columns:1fr;grid-template-rows:55% 45%}
+  .viewport-wrap{border-right:none;border-bottom:1px solid var(--border)}
+}
+
+.opt{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#bbb;cursor:pointer}
+.opt input{margin:0}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top -->
+  <header class="top">
+    <div class="brand">
+      <b>SPARK</b>
+      <span class="sep"></span>
+      <a href="/scores" target="_blank" title="Task-execution scores across generated BTs" style="font:500 11px var(--mono);color:var(--tx-2);text-decoration:none">Scores ↗</a>
+    </div>
+    <div class="chips">
+      <span class="chips-label">Systems:</span>
+      <div class="chip"><span class="dot" id="d-kinect"></span>Ex. Cam 1</div>
+      <div class="chip"><span class="dot" id="d-kinect2"></span>Ex. Cam 2</div>
+      <div class="chip"><span class="dot" id="d-rs"></span>Wrist Cam</div>
+      <div class="chip"><span class="dot" id="d-robot"></span><span id="d-robot-label">FR3</span></div>
+      <div class="chip"><span class="dot" id="d-sam3"></span>SAM3</div>
+      <div class="chip activity-pill idle" id="activity-pill" title="System activity"><span class="activity-dot"></span><span id="activity-text">Idle</span></div>
+      <button class="btn btn-s btn-p" id="btn-init" onclick="doInit()">Init</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="viewport-wrap">
+      <div class="cam-toolbar">
+        <div class="left">
+          <button class="btn btn-s" onclick="doCapture()">
+            <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Hi-Res
+          </button>
+          <button class="btn btn-s" id="btn-depth" onclick="toggleDepth()" title="Toggle depth view (turbo colormap)">Depth</button>
+          <button class="btn btn-s" id="btn-ir" onclick="toggleIR()" title="Toggle active-IR view (Kinect tiles only; works in the dark)">IR</button>
+          <button class="btn btn-s btn-record" id="btn-record" onclick="toggleRecord()" title="Record the current viewer feed to a .webm file"><span class="rec-dot"></span>Record</button>
+          <button class="btn btn-s" id="btn-feed" onclick="toggleFeed()" title="Pause/resume the live view. Paused = server encodes no frames for this tab (frees CPU during task runs); prompts and teleop keep working.">Feed: on</button>
+          <button class="btn btn-s" onclick="showLibrary()" title="Show saved BTs + promote toggle">Library</button>
+          <select id="cam-select" onchange="switchStreamCam(this.value)" style="font:500 10px var(--mono);background:var(--bg-2);color:var(--tx);border:0;border-radius:var(--r);padding:3px 7px;cursor:pointer">
+            <option value="all">All Cams</option>
+            <option value="sideview">Sideview</option>
+            <option value="birdview">Birdview</option>
+            <option value="wrist">Wrist</option>
+          </select>
+        </div>
+        <div class="right">
+          <span class="mode-label">Prompt:</span>
+          <button class="mode-btn active" data-mode="text" onclick="setMode('text')">Text</button>
+          <button class="mode-btn" data-mode="click" onclick="setMode('click')">Click</button>
+          <button class="mode-btn" data-mode="box" onclick="setMode('box')">Box</button>
+        </div>
+      </div>
+
+      <div class="viewport" id="viewport">
+        <div class="empty" id="cam-empty">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Initialize pipeline to begin</span>
+        </div>
+        <img id="cam-img" style="display:none" alt="" draggable="false"
+             onclick="if(_showingDetection)resumeLive()" title="Click to resume the live feed">
+        <canvas id="overlay-canvas" style="display:none"></canvas>
+        <span class="cam-tag" id="cam-tag" style="display:none">AGENTVIEW</span>
+        <span class="cam-ts" id="cam-ts" style="display:none"></span>
+        <span class="click-hint" id="click-hint" style="display:none"></span>
+      </div>
+
+      <div class="det-strip" id="det-strip" style="display:none">
+        <div class="det-strip-head">
+          <h4>Detections</h4>
+          <span class="det-count" id="det-count">0</span>
+        </div>
+        <div class="det-items" id="det-items"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panels">
+      <div class="tabs">
+        <button class="tab on" data-t="task" onclick="openTab('task')">Task</button>
+        <button class="tab" data-t="robot" onclick="openTab('robot')">Robot</button>
+        <button class="tab" data-t="log" onclick="openTab('log')">Log</button>
+        <button class="tab" data-t="hist" onclick="openTab('hist')">History</button>
+      </div>
+
+      <!-- TASK -->
+      <div class="pane on" id="p-task">
+        <div class="steps" id="steps">
+          <div class="step" id="s-cap">1 Capture</div>
+          <div class="step" id="s-det">2 Detect</div>
+          <div class="step" id="s-plan">3 Plan</div>
+          <div class="step" id="s-exec">4 Execute</div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h">Instruction</div>
+          <textarea id="in-instr" placeholder="pick up the red block and place it on the plate" rows="2"></textarea>
+        </div>
+
+        <div class="sec" id="sec-prompts">
+          <div class="sec-h">Text Prompts</div>
+          <div class="irow">
+            <input type="text" id="in-prompt" placeholder="Object name..." onkeydown="if(event.key==='Enter')addTag()">
+            <button class="btn btn-s" onclick="addTag()">+</button>
+            <button class="btn btn-s" onclick="autoPrompts()" title="Extract from instruction">Auto</button>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font:400 11px var(--mono);color:var(--tx-3);margin-top:4px;cursor:pointer" title="Return EVERY matching mask per prompt (block 1, block 2, ...). Required for stacking / multi-object tasks. Off = top-1 per label.">
+            <input type="checkbox" id="multi-inst"> all instances (stacking / multi-object)
+          </label>
+          <div class="tags" id="tag-list"></div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h">Actions</div>
+          <div class="brow" style="gap:12px;flex-wrap:wrap;margin-bottom:6px">
+            <label class="opt" title="Low-light test: feed each Kinect's IR image to SAM3 instead of RGB. Wrist (if connected) stays on its colour stream."><input type="checkbox" id="opt-detect-ir"> IR detection</label>
+            <!-- RF-DETR second opinion. Applies to the NEXT detect: the server
+                 drops its cached fusion gate on every change, no restart. -->
+            <label class="opt" title="Second-opinion detector (RF-DETR) over SAM3's masks.
+auto:   consulted only for the labels it is good at (cutlery, bowls, cups...)
+always: consulted for every label it knows -- penalises correct masks it misses
+off:    never consulted. The mask-quality gate stays ON either way.">
+              RF-DETR
+              <select id="opt-proposer-mode" onchange="setProposerMode(this.value)"
+                      style="background:#1a1a1a;color:#ddd;border:1px solid #444;border-radius:3px;font-size:12px;padding:1px 4px">
+                <option value="auto">auto</option>
+                <option value="always">always</option>
+                <option value="off">off</option>
+              </select>
+            </label>
+            <span id="proposer-status" class="opt" style="color:#666;font-family:var(--mono);font-size:11px;cursor:default"></span>
+          </div>
+          <div class="brow">
+            <button class="btn btn-f" onclick="doDetect()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Detect Objects</button>
+            <button class="btn btn-f" onclick="doPlan()"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg> Generate Plan</button>
+            <button class="btn btn-f btn-p" onclick="doExec(false)"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21"/></svg> Execute Pipeline</button>
+            <button class="btn btn-f btn-w" onclick="doExec(true)">Dry Run</button>
+            <!-- Runs the instruction against whatever is in the pending set
+                 right now -- your clicks, your boxes -- WITHOUT re-running
+                 SAM3. Execute Pipeline always re-detects and overwrites them. -->
+            <button class="btn btn-f" id="btn-draw-path" onclick="toggleDrawPath()" title="Draw the approach path on the live view. The transport flies it instead of a straight line -- SPARK has no lateral motion planning, so this is how you route around an obstacle.">Draw Path</button>
+            <button class="btn btn-f" onclick="doExecKeep(false)" title="Plan and execute on the detections already on screen. Does not re-detect, so click/box annotations survive.">Execute (keep detections)</button>
+            <button class="btn btn-f btn-d" onclick="doStop()" style="background:var(--red-15);border-color:var(--red);color:var(--red)">STOP</button>
+          </div>
+        </div>
+
+        <div class="sec" id="sec-plan" style="display:none">
+          <div class="sec-h">Generated Plan</div>
+          <div class="plan-box" id="plan-out"></div>
+        </div>
+      </div>
+
+      <!-- ROBOT -->
+      <div class="pane" id="p-robot">
+        <div class="sec">
+          <div class="sec-h">Connection</div>
+          <div class="irow">
+            <!-- value seeded on page load from /api/status (robot_ip) so the
+                 input reflects whichever robot family the server was started
+                 against; falls back to placeholder so the user must type if
+                 neither the YAML nor the CLI supplied one. -->
+            <input type="text" id="in-ip" value="" placeholder="set by --robot/--ip"
+                   oninput="this.dataset.userTouched='1'">
+            <button class="btn btn-s btn-p" id="btn-conn" onclick="doConnect()">Connect</button>
+          </div>
+          <div class="conn-progress" id="conn-prog">
+            <div class="conn-bar"><div class="conn-fill" id="conn-fill"></div></div>
+            <div class="conn-msg" id="conn-msg">Connecting...</div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h">TCP Position</div>
+          <div style="font:400 12px var(--mono);color:var(--tx-2);line-height:1.9">
+            <div>X: <span id="tcp-x" style="color:var(--tx-1)">---</span> m</div>
+            <div>Y: <span id="tcp-y" style="color:var(--tx-1)">---</span> m</div>
+            <div>Z: <span id="tcp-z" style="color:var(--tx-1)">---</span> m</div>
+            <div>Grip: <span id="tcp-g" style="color:var(--tx-1)">---</span></div>
+            <div style="border-top:1px dashed var(--bd);margin-top:6px;padding-top:6px;font-size:11px">
+              <div>TCP-X yaw: <span id="tcp-rx" style="color:var(--cyan)">---</span></div>
+              <div>TCP-Y yaw: <span id="tcp-ry" style="color:var(--cyan)">---</span> <small style="color:var(--tx-3)">(closing axis)</small></div>
+              <div>Tilt-from-vertical: <span id="tcp-tilt" style="color:var(--tx-1)">---</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec only-singlearm">
+          <div class="sec-h">Teleop <span style="color:var(--cyan);font-weight:400">(keyboard + gamepad)</span></div>
+          <div style="font:400 9px var(--mono);color:var(--tx-3);margin-bottom:6px;line-height:1.5">
+            <b style="color:var(--tx-2)">Linear:</b> I/K=fwd/back J/L=left/right U/O=up/down<br>
+            <b style="color:var(--tx-2)">Rotate:</b> W/S=pitch A/D=roll Q/E=yaw<br>
+            <b style="color:var(--tx-2)">Other:</b> G=grip toggle H=home Esc=STOP<br>
+            <b style="color:var(--tx-2)">Gamepad:</b> L-stick=XY R-stick=rot D-pad=Z L/R=roll triggers=variable grip View=home Start=recover
+          </div>
+          <div id="teleop-zone" tabindex="0" style="
+            background:var(--bg-0);border-radius:var(--r);padding:10px;
+            text-align:center;cursor:pointer;transition:var(--fast);outline:none;
+            font:500 11px var(--sans);color:var(--tx-3);
+          " onfocus="this.style.color='var(--accent)'" onblur="this.style.color='var(--tx-3)'">
+            <div id="teleop-status">Click buttons or use keyboard</div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px" id="key-indicators">
+              <span class="key-ind jog-btn" data-k="i" onmousedown="jogStart('i')" onmouseup="jogStop('i')" onmouseleave="jogStop('i')" ontouchstart="jogStart('i')" ontouchend="jogStop('i')">I<small>fwd</small></span>
+              <span class="key-ind jog-btn" data-k="k" onmousedown="jogStart('k')" onmouseup="jogStop('k')" onmouseleave="jogStop('k')" ontouchstart="jogStart('k')" ontouchend="jogStop('k')">K<small>back</small></span>
+              <span class="key-ind jog-btn" data-k="j" onmousedown="jogStart('j')" onmouseup="jogStop('j')" onmouseleave="jogStop('j')" ontouchstart="jogStart('j')" ontouchend="jogStop('j')">J<small>left</small></span>
+              <span class="key-ind jog-btn" data-k="l" onmousedown="jogStart('l')" onmouseup="jogStop('l')" onmouseleave="jogStop('l')" ontouchstart="jogStart('l')" ontouchend="jogStop('l')">L<small>right</small></span>
+              <span class="key-ind jog-btn" data-k="u" onmousedown="jogStart('u')" onmouseup="jogStop('u')" onmouseleave="jogStop('u')" ontouchstart="jogStart('u')" ontouchend="jogStop('u')">U<small>up</small></span>
+              <span class="key-ind jog-btn" data-k="o" onmousedown="jogStart('o')" onmouseup="jogStop('o')" onmouseleave="jogStop('o')" ontouchstart="jogStart('o')" ontouchend="jogStop('o')">O<small>down</small></span>
+              <span class="key-ind jog-btn" data-k="g" onclick="gripperOpen=!gripperOpen;grip(gripperOpen?'open':'close')">G<small>grip</small></span>
+              <span class="key-ind jog-btn" data-k="w" onmousedown="jogStart('w')" onmouseup="jogStop('w')" onmouseleave="jogStop('w')" ontouchstart="jogStart('w')" ontouchend="jogStop('w')">W<small>pitch+</small></span>
+              <span class="key-ind jog-btn" data-k="s" onmousedown="jogStart('s')" onmouseup="jogStop('s')" onmouseleave="jogStop('s')" ontouchstart="jogStart('s')" ontouchend="jogStop('s')">S<small>pitch-</small></span>
+              <span class="key-ind jog-btn" data-k="a" onmousedown="jogStart('a')" onmouseup="jogStop('a')" onmouseleave="jogStop('a')" ontouchstart="jogStart('a')" ontouchend="jogStop('a')">A<small>roll+</small></span>
+              <span class="key-ind jog-btn" data-k="d" onmousedown="jogStart('d')" onmouseup="jogStop('d')" onmouseleave="jogStop('d')" ontouchstart="jogStart('d')" ontouchend="jogStop('d')">D<small>roll-</small></span>
+              <span class="key-ind jog-btn" data-k="q" onmousedown="jogStart('q')" onmouseup="jogStop('q')" onmouseleave="jogStop('q')" ontouchstart="jogStart('q')" ontouchend="jogStop('q')">Q<small>yaw+</small></span>
+              <span class="key-ind jog-btn" data-k="e" onmousedown="jogStart('e')" onmouseup="jogStop('e')" onmouseleave="jogStop('e')" ontouchstart="jogStart('e')" ontouchend="jogStop('e')">E<small>yaw-</small></span>
+              <span class="key-ind jog-btn" style="background:var(--red-15);border-color:var(--red)" onclick="doStop()">ESC<small>stop</small></span>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:5px;justify-content:center">
+              <button class="btn btn-s" onclick="doHome()" style="flex:1">Home</button>
+              <button class="btn btn-s" onclick="doRecover()" style="flex:1" title="Clear reflex / protective-stop without homing. Use this when teleop says no motion after hitting a singularity or joint limit.">Recover</button>
+              <button class="btn btn-s btn-d" onclick="doStop()" style="flex:1">STOP</button>
+            </div>
+            <div id="gamepad-status" style="font:400 10px var(--mono);color:var(--tx-3);margin-top:6px"></div>
+            <label class="opt" style="font-size:10px;margin-top:5px;color:var(--tx-3)">
+              <input type="checkbox" onchange="gamepadLogInput=this.checked" title="Log the raw index of each button/axis you press, to re-map a non-standard controller">
+              log gamepad input (press a button to see its index)
+            </label>
+            <!-- Viser-IK teleop (external robots_realtime subprocess).
+                 Releases SPARK FCI -> spawns rr-session -> opens viser
+                 gizmo. Mutually exclusive with gamepad/keyboard teleop. -->
+            <div style="display:flex;gap:4px;margin-top:8px;align-items:center">
+              <button id="viser-teleop-start-btn" class="btn btn-s" onclick="_viserTeleopStart()" style="flex:1;background:#3a5fb0;color:#fff" title="Hands FCI control to robots_realtime's viser browser IK gizmo (drag the SE(3) frame in 3D). SPARK gamepad/keyboard teleop is disabled while active.">Viser IK Teleop</button>
+              <button id="viser-teleop-stop-btn" class="btn btn-s" onclick="_viserTeleopStop()" style="flex:1;background:#3a3a3a;color:#fff;display:none" title="Stop the viser subprocess and return FCI to SPARK.">Stop Viser</button>
+            </div>
+            <div id="viser-teleop-status" style="font:400 9px var(--mono);color:var(--tx-3);margin-top:4px"></div>
+          </div>
+        </div>
+
+        <!-- BT Library: browse cached behaviour-trees, toggle cache-vs-Gemini
+             for the NEXT /api/execute, pin a specific BT (single-shot),
+             promote/unpromote, delete. Read-on-each-call so no server
+             restart is needed after flipping the toggle. -->
+        <div class="sec">
+          <div class="sec-h" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="_btLibToggleCollapse()">
+            <span>BT Library <span id="bt-lib-count" style="color:var(--cyan);font-weight:400">(0)</span></span>
+            <span id="bt-lib-collapse-ind" style="color:var(--tx-3);font-size:10px">▾</span>
+          </div>
+          <div id="bt-lib-body">
+            <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
+              <button id="bt-lib-toggle-btn" class="btn btn-s" onclick="_btLibToggleCache()" style="flex:1" title="Use Gemini for the next /api/execute, or serve a cached BT from this library. UI override beats the SPARK_DISABLE_LLM env var.">Loading...</button>
+              <button class="btn btn-s" onclick="_btLibRefresh()" style="flex:0 0 auto;padding:5px 8px" title="Refresh now (auto-polls every 10s)">↻</button>
+            </div>
+            <div id="bt-lib-source" style="font:400 9px var(--mono);color:var(--tx-3);margin-bottom:6px"></div>
+            <div id="bt-lib-pin-banner" style="font:500 10px var(--mono);color:var(--cyan);background:var(--cyan-15);border:1px solid var(--cyan-30);border-radius:var(--r);padding:5px 8px;margin-bottom:6px;display:none">
+              <span id="bt-lib-pin-text">pinned</span>
+              <span style="float:right;cursor:pointer;color:var(--tx-2)" onclick="_btLibUnpin()" title="Clear pin">✕</span>
+            </div>
+            <input type="text" id="bt-lib-search" placeholder="filter by instruction..." oninput="_btLibRender()" style="margin-bottom:6px;font-size:11px;padding:4px 8px">
+            <div id="bt-lib-list" style="max-height:300px;overflow-y:auto;border-radius:var(--r);background:var(--bg-0)">
+              <div style="padding:8px;color:var(--tx-3);font:400 10px var(--mono);text-align:center">loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bimanual teleop: per-arm jog blocks, handoff button, TM-bag trigger. -->
+        <div class="sec only-bimanual_franka">
+          <div class="sec-h">Bimanual Teleop <span style="color:#c89ad0;font-weight:400">(L: WASD/IJKL, R: arrows+numpad)</span></div>
+          <div style="font:400 9px var(--mono);color:var(--tx-3);margin-bottom:6px;line-height:1.5">
+            <b style="color:var(--tx-2)">Left arm:</b> I/K=fwd/back J/L=left/right U/O=up/down (W/A/S/D/Q/E rotate)<br>
+            <b style="color:var(--tx-2)">Right arm:</b> &#8593;/&#8595;/&#8592;/&#8594; XY + Numpad 7/9 = up/down<br>
+            <b style="color:var(--tx-2)">Grippers:</b> [ / ] = left open/close &nbsp; ; / ' = right open/close<br>
+            <b style="color:var(--tx-2)">Gamepad:</b> Left stick = left arm, Right stick = right arm, Triggers = grippers
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:rgba(232,160,255,.04);border:1px solid #4a1a6a;border-radius:var(--r);padding:6px">
+              <div style="font:600 11px var(--mono);color:#c89ad0;text-align:center;margin-bottom:4px">Left arm</div>
+              <div style="display:flex;gap:3px;justify-content:center;margin-bottom:4px">
+                <button class="btn btn-s" style="flex:1" onclick="armGrip('left','open')">Open</button>
+                <button class="btn btn-s" style="flex:1" onclick="armGrip('left','close')">Close</button>
+              </div>
+              <div style="display:flex;gap:3px">
+                <button class="btn btn-s" style="flex:1" onclick="armHome('left')">Home L</button>
+                <button class="btn btn-s btn-d" style="flex:1" onclick="armStop('left')">Stop L</button>
+              </div>
+            </div>
+            <div style="background:rgba(232,160,255,.04);border:1px solid #4a1a6a;border-radius:var(--r);padding:6px">
+              <div style="font:600 11px var(--mono);color:#c89ad0;text-align:center;margin-bottom:4px">Right arm</div>
+              <div style="display:flex;gap:3px;justify-content:center;margin-bottom:4px">
+                <button class="btn btn-s" style="flex:1" onclick="armGrip('right','open')">Open</button>
+                <button class="btn btn-s" style="flex:1" onclick="armGrip('right','close')">Close</button>
+              </div>
+              <div style="display:flex;gap:3px">
+                <button class="btn btn-s" style="flex:1" onclick="armHome('right')">Home R</button>
+                <button class="btn btn-s btn-d" style="flex:1" onclick="armStop('right')">Stop R</button>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:4px">
+            <button class="btn btn-p btn-f" style="flex:2" onclick="doHandoff('left','right')" title="Trigger handoff from left arm to right arm at the meeting point (uses default meeting point [0,0,0.30])">L &rarr; R Handoff</button>
+            <button class="btn btn-p btn-f" style="flex:2" onclick="doHandoff('right','left')" title="Trigger handoff from right arm to left arm">R &rarr; L Handoff</button>
+            <button class="btn btn-s" style="flex:1" onclick="doBimanualHomeBoth()">Home Both</button>
+          </div>
+          <div id="bimanual-inter-distance" style="font:400 10px var(--mono);color:var(--tx-3);margin-top:6px;text-align:center"></div>
+        </div>
+
+        <div class="sec only-g1">
+          <div class="sec-h">Hand</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn" style="flex:1" onclick="grip('open')" title="Dex3 / G1 hand open">Open</button>
+            <button class="btn" style="flex:1" onclick="grip('close')" title="Dex3 / G1 hand close">Close</button>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h">Diagnostics</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn" style="flex:1" onclick="logPose()" title="Log current TCP pose and gripper state">Log Pose</button>
+            <button class="btn only-ur10e" style="flex:1" onclick="testYaw()" title="UR10e: cycle 0/30/60 deg wrist yaw to identify gripper closing axis">Test Yaw</button>
+            <button class="btn only-ur10e" style="flex:1" onclick="testWristObb()" title="UR10e: capture wrist image and log OBB angle">Wrist OBB</button>
+            <button class="btn only-bimanual_franka" style="flex:1" onclick="showPrimitives()" title="Saved primitives (TM bag)">TM Bag</button>
+          </div>
+        </div>
+
+        <div class="sec">
+          <button class="btn btn-f btn-d" onclick="doPass()" title="Stop the run and record this episode as a SUCCESS"
+                  style="font-size:13px;padding:10px;background:var(--grn-15);border-color:var(--grn);color:var(--grn)">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M4 13l5 5L20 6"/></svg>
+            PASS &nbsp;(stop + mark success)
+          </button>
+          <button class="btn btn-f btn-d" onclick="doStop()" title="Stop the run; the episode is kept and labelled FAIL"
+                  style="font-size:13px;padding:10px;margin-top:6px">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            EMERGENCY STOP &nbsp;(Esc)
+          </button>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div class="pane" id="p-log">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="sec-h" style="margin:0;border:none;padding:0">System Log</div>
+          <button class="btn btn-s" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="log" id="log">
+          <div class="log-e"><span class="log-t">--:--:--</span><span class="log-m inf">SPARK ready</span></div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="pane" id="p-hist">
+        <div class="sec-h">Task History</div>
+        <div id="hist-list"><div class="empty-msg">No tasks yet</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let tags = [];
+let promptMode = 'text';
+let drawing = false;
+let drawStart = null;
+
+// ---- Tabs ----
+function openTab(t){
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(e=>e.classList.remove('on'));
+  document.querySelector(`[data-t="${t}"]`).classList.add('on');
+  document.getElementById(`p-${t}`).classList.add('on');
+}
+
+// ---- Prompt mode ----
+function setMode(m){
+  promptMode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  const hint=document.getElementById('click-hint');
+  const sec=document.getElementById('sec-prompts');
+  if(m==='click'){
+    hint.textContent='Click on an object to detect it';
+    hint.style.display='block';
+    sec.style.display='none';
+  } else if(m==='box'){
+    hint.textContent='Draw a box around an object';
+    hint.style.display='block';
+    sec.style.display='none';
+  } else {
+    hint.style.display='none';
+    sec.style.display='block';
+  }
+}
+
+// ---- Canvas interaction ----
+function setupCanvas(){
+  const vp=document.getElementById('viewport');
+  const canvas=document.getElementById('overlay-canvas');
+  const img=document.getElementById('cam-img');
+
+  vp.addEventListener('mousedown',e=>{
+    if(promptMode==='text') return;
+    const rect=img.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    if(x<0||y<0||x>rect.width||y>rect.height) return;
+    if(promptMode==='click'){
+      doClickDetect(x,y,rect.width,rect.height);
+    } else if(promptMode==='box'){
+      drawing=true;
+      drawStart={x,y,rw:rect.width,rh:rect.height,rx:rect.left,ry:rect.top};
+      canvas.width=rect.width; canvas.height=rect.height;
+      canvas.style.display='block';
+      canvas.style.left=rect.left-vp.getBoundingClientRect().left+'px';
+      canvas.style.top=rect.top-vp.getBoundingClientRect().top+'px';
+      canvas.style.width=rect.width+'px';
+      canvas.style.height=rect.height+'px';
+    }
+  });
+
+  window.addEventListener('mousemove',e=>{
+    if(!drawing||!drawStart) return;
+    const canvas=document.getElementById('overlay-canvas');
+    const ctx=canvas.getContext('2d');
+    const x=e.clientX-drawStart.rx, y=e.clientY-drawStart.ry;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle='#00d4aa';
+    ctx.lineWidth=2;
+    ctx.setLineDash([5,4]);
+    ctx.strokeRect(drawStart.x,drawStart.y,x-drawStart.x,y-drawStart.y);
+    // Corner markers
+    ctx.setLineDash([]);
+    ctx.fillStyle='#00d4aa';
+    [drawStart,{x,y}].forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();
+    });
+  });
+
+  window.addEventListener('mouseup',e=>{
+    if(!drawing||!drawStart) return;
+    drawing=false;
+    const canvas=document.getElementById('overlay-canvas');
+    canvas.style.display='none';
+    const x=e.clientX-drawStart.rx, y=e.clientY-drawStart.ry;
+    if(Math.abs(x-drawStart.x)<10&&Math.abs(y-drawStart.y)<10) return;
+    const bx1=Math.min(drawStart.x,x), by1=Math.min(drawStart.y,y);
+    const bx2=Math.max(drawStart.x,x), by2=Math.max(drawStart.y,y);
+    doBoxDetect(bx1,by1,bx2,by2,drawStart.rw,drawStart.rh);
+    drawStart=null;
+  });
+}
+
+// ---- API ----
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  const r=await fetch(API+path,opts);
+  return r.json();
+}
+
+// ---- Status ----
+function setDot(id,on){document.getElementById(id).className='dot '+(on?'on':'off')}
+
+// Robot-family theming -------------------------------------------------
+// Display-name table mirrors server-side `_ROBOT_DISPLAY` in routes/core.py
+// so /api/status (which only ships the raw family string) can drive a
+// theme + chip-label swap without a second round-trip to /api/robot.
+const ROBOT_FAMILIES=['ur10e','franka','g1','bimanual_franka'];
+const ROBOT_DISPLAY_NAMES={ur10e:'UR10e',franka:'FR3',g1:'Unitree G1',bimanual_franka:'Bimanual'};
+let _currentRobotFamily=null;
+function applyRobotFamily(fam){
+  if(!fam) return;
+  fam=String(fam).toLowerCase();
+  if(!ROBOT_FAMILIES.includes(fam)) return;        // unknown, leave UI alone
+  if(fam===_currentRobotFamily) return;            // no-op fast path
+  _currentRobotFamily=fam;
+  document.body.classList.remove('robot-franka','robot-ur10e','robot-g1','robot-bimanual_franka');
+  document.body.classList.add('robot-'+fam);
+  const lbl=document.getElementById('d-robot-label');
+  if(lbl) lbl.textContent=ROBOT_DISPLAY_NAMES[fam]||fam;
+  // Per-family teleop profile: keyboard map, gamepad button indices,
+  // and linear/angular gains. See TELEOP_PROFILES above to retune one
+  // family without touching the others. Safe to call before TP exists
+  // (early-load order); _setActiveTeleop is a no-op for unknown families.
+  if(typeof _setActiveTeleop==='function') _setActiveTeleop(fam);
+}
+
+async function pollStatus(){
+  try{
+    const s=await api('GET','/api/status');
+    setDot('d-kinect',s.kinect_connected);
+    setDot('d-kinect2',s.kinect2_connected);
+    setDot('d-rs',s.realsense_connected);
+    setDot('d-robot',s.robot_connected);
+    setDot('d-sam3',s.perception_ready);
+    // Theme follows backend's reported robot family, covers the case
+    // where /api/robot was unavailable on load OR the operator restarts
+    // the pipeline with a different --robot flag.
+    if(s.robot_family) applyRobotFamily(s.robot_family);
+    // Seed the IP input from the server-configured robot_ip (from
+    // --ip / configs/<family>_default.yaml) the first time we see one,
+    // so the Connect button doesn't blast the historical UR10e default
+    // at the Franka. After the user manually edits the field, leave it
+    // alone, they may be testing a different address.
+    if(s.robot_ip){
+      const ipBox=document.getElementById('in-ip');
+      if(ipBox && !ipBox.value && !ipBox.dataset.userTouched){
+        ipBox.value=s.robot_ip;
+      }
+    }
+    if(s.initialized){
+      const b=document.getElementById('btn-init');
+      b.textContent='Ready';b.disabled=true;b.style.opacity='.5';
+    }
+    updateActivity(s.activity||'idle');
+  }catch(e){}
+}
+
+function updateActivity(act){
+  const pill=document.getElementById('activity-pill');
+  const txt=document.getElementById('activity-text');
+  if(!pill||!txt) return;
+  const labels={idle:'Idle',capturing:'Capturing',detecting:'Detecting',planning:'Planning',executing:'Executing'};
+  txt.textContent=labels[act]||act;
+  let cls='idle';
+  if(act==='executing') cls='executing';
+  else if(act==='capturing'||act==='detecting'||act==='planning') cls='thinking';
+  pill.className='chip activity-pill '+cls;
+}
+
+// ---- Init ----
+async function doInit(){
+  const b=document.getElementById('btn-init');
+  b.innerHTML='<span class="spinner"></span>';b.disabled=true;
+  log('Initializing pipeline...','inf');
+  try{
+    const r=await api('POST','/api/initialize');
+    log('Pipeline initialized','ok');
+    toast('Pipeline ready','ok');
+    pollStatus();
+    doCapture();
+  }catch(e){log('Init failed: '+e.message,'err');toast('Init failed','err');b.textContent='Init';b.disabled=false}
+}
+
+// ---- Connect robot ----
+async function doConnect(){
+  const ip=document.getElementById('in-ip').value;
+  const btn=document.getElementById('btn-conn');
+  const prog=document.getElementById('conn-prog');
+  const fill=document.getElementById('conn-fill');
+  const msg=document.getElementById('conn-msg');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  prog.style.display='block';
+  fill.style.width='0';
+  // Use the human-readable robot name from /api/robot (set by --robot
+  // family + per-family YAML) so the log line isn't hardcoded UR10e.
+  const robotName = (ROBOT_DISPLAY_NAMES && _currentRobotFamily)
+    ? ROBOT_DISPLAY_NAMES[_currentRobotFamily] : 'robot';
+  msg.textContent='Connecting to '+(ip||'(default)')+'...';
+  // Animate progress
+  let w=0;
+  const iv=setInterval(()=>{w=Math.min(w+Math.random()*15,90);fill.style.width=w+'%'},200);
+  log('Connecting to '+robotName+' at '+(ip||'(server-default)')+'...','inf');
+  try{
+    // Empty ip -> backend uses the server-side configured IP (Franka FR3
+    // default 172.16.0.2, etc.). Avoids overwriting with the UR10e default.
+    const r=await api('POST','/api/connect_robot',{robot_ip:ip||''});
+    clearInterval(iv);
+    if(r.connected){
+      fill.style.width='100%';msg.textContent='Connected';fill.style.background='var(--green)';
+      log(robotName+' connected at '+r.robot_ip,'ok');toast('Robot connected','ok');
+      // Reflect the IP the backend actually used back into the input.
+      if(r.robot_ip){document.getElementById('in-ip').value=r.robot_ip;}
+    } else {
+      fill.style.width='100%';fill.style.background='var(--red)';
+      msg.textContent=r.error||'Connection failed';
+      log('Connection failed: '+(r.error||'unknown'),'err');toast('Connection failed','err');
+    }
+    pollStatus();
+    setTimeout(()=>{prog.style.display='none';fill.style.background='var(--cyan)'},3000);
+  }catch(e){
+    clearInterval(iv);fill.style.width='100%';fill.style.background='var(--red)';
+    msg.textContent=e.message;log('Connection error: '+e.message,'err');
+  }
+  btn.disabled=false;btn.textContent='Connect';
+}
+
+// ---- Capture ----
+async function doCapture(){
+  setStep('cap');log('Capturing...','inf');
+  try{
+    const d=await api('GET','/api/capture');
+    const sel=(_streamCam&&_streamCam!=='all')?_streamCam:'sideview';
+    const cam=d[sel]||d.sideview||Object.values(d)[0];
+    if(!cam) return;
+    const src=sel==='depth'&&cam.depth?cam.depth:cam.rgb;
+    if(!src){log('No data for '+sel,'err');return}
+    showImage('data:image/jpeg;base64,'+src, sel.toUpperCase());
+    log('Captured '+cam.width+'x'+cam.height,'ok');
+  }catch(e){log('Capture failed: '+e.message,'err')}
+}
+
+let _showingDetection=false;
+let _flashTimer=null;
+function flashImage(src,label,durationMs){
+  // Show an image briefly then auto-resume live feed
+  if(_flashTimer){clearTimeout(_flashTimer);_flashTimer=null}
+  const img=document.getElementById('cam-img');
+  img.src=src;img.style.display='block';
+  document.getElementById('cam-empty').style.display='none';
+  document.getElementById('cam-tag').textContent=label||'';
+  document.getElementById('cam-tag').style.display='block';
+  const ts=new Date().toLocaleTimeString('en',{hour12:false});
+  document.getElementById('cam-ts').textContent=ts;
+  document.getElementById('cam-ts').style.display='block';
+  _showingDetection=true;
+  stopLiveFeed();
+  // durationMs<=0 means HOLD: the frame stays until the operator asks for
+  // live again. A detection you cannot look at is a detection you cannot
+  // check, and 3 s was not enough to read a mask against the scene.
+  if(durationMs>0){
+    _flashTimer=setTimeout(()=>{
+      _showingDetection=false;_flashTimer=null;
+      startLiveFeed();
+      document.getElementById('cam-tag').textContent='LIVE';
+    },durationMs);
+  }else{
+    const tag=document.getElementById('cam-tag');
+    if(tag) tag.textContent=(label||'DETECTION')+'  -  click to resume live';
+  }
+}
+// Click the frame to drop the held detection and go back to live.
+function resumeLive(){
+  if(_flashTimer){clearTimeout(_flashTimer);_flashTimer=null}
+  _showingDetection=false;
+  startLiveFeed();
+  const tag=document.getElementById('cam-tag');
+  if(tag) tag.textContent='LIVE';
+}
+// HOLD by default. Callers that genuinely want a flash pass a duration.
+function showImage(src,label,durationMs){flashImage(src,label,durationMs===undefined?0:durationMs)}
+// Click on image to resume immediately (skip the timer)
+document.addEventListener('DOMContentLoaded',()=>{
+  const img=document.getElementById('cam-img');
+  if(img) img.addEventListener('click',e=>{
+    if(_anchorMode) return;
+    if(_showingDetection){
+      if(_flashTimer){clearTimeout(_flashTimer);_flashTimer=null}
+      _showingDetection=false;
+      clearPersistentOverlay();   // dismiss bbox overlay too
+      startLiveFeed();
+      document.getElementById('cam-tag').textContent='LIVE';
+    }
+  });
+});
+
+// ---- RF-DETR second opinion (perception.fusion.proposer) ----
+// The select is a runtime override of the family YAML: the server drops its
+// cached fusion gate on every change, so the new mode is live on the next
+// detect with no restart. The status line beside it is READ-ONLY -- whether
+// the fusion gate as a whole is up, and which backend is actually loaded.
+function _renderProposerStatus(s){
+  const sel=document.getElementById('opt-proposer-mode');
+  const tag=document.getElementById('proposer-status');
+  if(!s||s.available===false){if(tag)tag.textContent='';return}
+  if(sel&&s.mode)sel.value=s.mode;               // CURRENT mode, not a guess
+  if(!tag)return;
+  const backend=s.loaded_backend||s.backend||'none';
+  const src=s.source&&s.source!=='config'?' via '+s.source:'';
+  tag.textContent='gate '+(s.fusion_enabled?'on':'off')+' / '+backend+src;
+  tag.style.color=s.error?'#c55':(s.fusion_enabled?'#666':'#a80');
+  tag.title=s.error?s.error:
+    'fusion gate: '+(s.gate_state||'?')+'\nbackend: '+backend+
+    '\nscored labels: '+((s.labels&&s.labels.length)?s.labels.join(', '):'(all in-vocabulary)');
+}
+async function refreshProposerMode(){
+  try{_renderProposerStatus(await api('GET','/api/perception/fusion_status'))}
+  catch(e){/* status only; never block the detect panel on it */}
+}
+async function setProposerMode(mode){
+  try{
+    const s=await api('POST','/api/perception/proposer_mode',{mode:mode});
+    _renderProposerStatus(s);
+    log('RF-DETR second opinion: '+mode,'ok');
+  }catch(e){
+    log('RF-DETR mode change failed: '+e.message,'err');
+    refreshProposerMode();   // snap the select back to the server's truth
+  }
+}
+document.addEventListener('DOMContentLoaded',refreshProposerMode);
+
+// ---- Camera switch ----
+// ---- Detect (text) ----
+async function doDetect(){
+  const p=tags.length?tags:autoExtract();
+  if(!p.length){toast('Add prompts first','err');return}
+  stopLiveFeed();
+  setStep('det');log('Detecting: '+p.join(', '),'inf');
+  document.getElementById('cam-tag').textContent='DETECTING...';
+  try{
+    const multiInst=document.getElementById('multi-inst')?.checked||false;
+    const d=await api('POST','/api/detect',{prompts:p,multi_instance:multiInst});
+    if(d.annotated_image){
+      // Keep detection masks visible until user clicks image or clicks Execute
+      stopLiveFeed();
+      _showingDetection=true;
+      const img=document.getElementById('cam-img');
+      img.src='data:image/jpeg;base64,'+d.annotated_image;
+      img.style.display='block';
+      document.getElementById('cam-empty').style.display='none';
+      document.getElementById('cam-tag').textContent='DETECTIONS (click to resume)';
+      _lastAnnotatedB64=d.annotated_image;
+      document.getElementById('cam-tag').style.display='block';
+      console.log('Detection image set, size='+d.annotated_image.length);
+    } else {
+      console.log('No annotated_image in response');
+      startLiveFeed();
+    }
+    await refreshDets(d.detections);
+    log('Found '+d.count+' objects','ok');
+    d.detections.forEach(o=>{
+      const pos=o.position_3d?`(${o.position_3d.map(v=>v.toFixed(3)).join(', ')})`:'N/A';
+      log('  '+o.label+': '+Math.round(o.confidence*100)+'% pos='+pos,'acc');
+    });
+  }catch(e){
+    log('Detection failed: '+e.message,'err');
+    _showingDetection=false;
+    startLiveFeed();
+  }
+}
+
+// ---- Operator-drawn approach path -----------------------------------------
+// perception/annotations.py has always described a "trace" kind feeding "the
+// executor's waypoint path"; this is the producer. Draw on the live view, the
+// points go to /api/annotate_trace, get back-projected onto a horizontal plane
+// at the target's height, and the next transport to that label flies them as
+// blended lead rows.
+let _drawMode=false, _drawing=false, _drawPts=[];
+
+function _imgNorm(ev){
+  // object-fit:contain -> normalized [0,1] image coords, same math as the
+  // detection overlay so a drawn point lands where it looks like it landed.
+  const img=document.getElementById('cam-img');
+  if(!img||!img.naturalWidth) return null;
+  const r=img.getBoundingClientRect();
+  const ia=img.naturalWidth/img.naturalHeight, ba=r.width/r.height;
+  let rw,rh,ox,oy;
+  if(ia>ba){rw=r.width; rh=r.width/ia; ox=0; oy=(r.height-rh)/2;}
+  else{rh=r.height; rw=r.height*ia; ox=(r.width-rw)/2; oy=0;}
+  const x=(ev.clientX-r.left-ox)/rw, y=(ev.clientY-r.top-oy)/rh;
+  if(x<0||x>1||y<0||y>1) return null;
+  return [x,y];
+}
+
+function _paintPath(){
+  const img=document.getElementById('cam-img');
+  const cv=document.getElementById('overlay-canvas');
+  if(!img||!cv) return;
+  const r=img.getBoundingClientRect();
+  const vp=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width; cv.height=r.height;
+  cv.style.display='block';
+  cv.style.left=(r.left-vp.left)+'px'; cv.style.top=(r.top-vp.top)+'px';
+  cv.style.width=r.width+'px'; cv.style.height=r.height+'px';
+  const ia=img.naturalWidth/img.naturalHeight, ba=r.width/r.height;
+  let rw,rh,ox,oy;
+  if(ia>ba){rw=r.width; rh=r.width/ia; ox=0; oy=(r.height-rh)/2;}
+  else{rh=r.height; rw=r.height*ia; ox=(r.width-rw)/2; oy=0;}
+  const g=cv.getContext('2d');
+  g.clearRect(0,0,cv.width,cv.height);
+  if(_drawPts.length<1) return;
+  g.strokeStyle='#4af'; g.lineWidth=3; g.lineJoin='round'; g.lineCap='round';
+  g.beginPath();
+  _drawPts.forEach((p,i)=>{
+    const X=ox+p[0]*rw, Y=oy+p[1]*rh;
+    if(i===0) g.moveTo(X,Y); else g.lineTo(X,Y);
+  });
+  g.stroke();
+  const last=_drawPts[_drawPts.length-1];
+  g.fillStyle='#4af';
+  g.beginPath(); g.arc(ox+last[0]*rw, oy+last[1]*rh, 5, 0, 6.284); g.fill();
+}
+
+function toggleDrawPath(){
+  _drawMode=!_drawMode;
+  const b=document.getElementById('btn-draw-path');
+  const img=document.getElementById('cam-img');
+  if(b) b.style.background=_drawMode?'#4af':'';
+  if(img) img.style.cursor=_drawMode?'crosshair':'';
+  if(_drawMode){
+    _drawPts=[];
+    // Freeze the frame: drawing against a moving picture means the path is
+    // drawn on one scene and executed against another.
+    if(typeof stopLiveFeed==='function' && liveFeedRunning) stopLiveFeed();
+    log('Draw the approach path on the view (drag). Release to arm it.','inf');
+  } else {
+    _drawPts=[]; _paintPath();
+    log('Draw-path mode off.','inf');
+  }
+}
+
+async function _armDrawnPath(){
+  if(_drawPts.length<2){log('Path too short; draw a longer line.','err');return}
+  const dets=(_currentDets||[]).map(d=>d.label);
+  const guess=dets.length?dets[0]:'';
+  const label=prompt('This path is the approach to which target?', guess);
+  if(!label){log('Path discarded (no target given).','inf');_drawPts=[];_paintPath();return}
+  const cam=(document.getElementById('cam-tag')?.textContent||'birdview').toLowerCase().trim();
+  try{
+    const r=await api('POST','/api/annotate_trace',
+      {points:_drawPts, camera:cam, label:label});
+    log('Path armed for "'+label+'": '+r.waypoints.length+' waypoint(s) at z='+
+        r.z.toFixed(3)+' — the next move to it will fly this path.','ok');
+    toast('Path armed','ok');
+  }catch(e){
+    log('Could not arm the path: '+e.message,'err');
+    toast('Path rejected','err');
+  }
+}
+
+(function _wireDrawPath(){
+  const attach=()=>{
+    const img=document.getElementById('cam-img');
+    if(!img) return setTimeout(attach,500);
+    img.addEventListener('mousedown',ev=>{
+      if(!_drawMode) return;
+      ev.preventDefault(); ev.stopPropagation();
+      const p=_imgNorm(ev); if(!p) return;
+      _drawing=true; _drawPts=[p]; _paintPath();
+    });
+    img.addEventListener('mousemove',ev=>{
+      if(!_drawMode||!_drawing) return;
+      const p=_imgNorm(ev); if(!p) return;
+      const last=_drawPts[_drawPts.length-1];
+      // Thin at capture time; the backend decimates again in metres.
+      if(!last||Math.hypot(p[0]-last[0],p[1]-last[1])>0.01){_drawPts.push(p);_paintPath();}
+    });
+    window.addEventListener('mouseup',()=>{
+      if(!_drawMode||!_drawing) return;
+      _drawing=false;
+      _armDrawnPath();
+    });
+  };
+  attach();
+})();
+
+// ---- Detect (click) ----
+async function doClickDetect(x,y,w,h){
+  const label=prompt('Label this object (or leave blank):','')||'';
+  setStep('det');log(`Click detect at (${Math.round(x)},${Math.round(y)})`,'inf');
+  try{
+    const d=await api('POST','/api/detect_click',{x,y,img_width:w,img_height:h,label});
+    if(d.annotated_image){_lastAnnotatedB64=d.annotated_image;showImage('data:image/jpeg;base64,'+d.annotated_image);}
+    await refreshDets(d.detections);
+    log('Click detected: '+(d.detections[0]?.label||'nothing')+' ('+Math.round((d.detections[0]?.confidence||0)*100)+'%)','ok');
+  }catch(e){log('Click detect failed: '+e.message,'err')}
+}
+
+// ---- Detect (box) ----
+async function doBoxDetect(x1,y1,x2,y2,w,h){
+  const label=prompt('Label this object (or leave blank):','')||'';
+  setStep('det');log(`Box detect (${Math.round(x1)},${Math.round(y1)})-(${Math.round(x2)},${Math.round(y2)})`,'inf');
+  try{
+    const d=await api('POST','/api/detect_box',{x1,y1,x2,y2,img_width:w,img_height:h,label});
+    if(d.annotated_image){_lastAnnotatedB64=d.annotated_image;showImage('data:image/jpeg;base64,'+d.annotated_image);}
+    await refreshDets(d.detections);
+    log('Box detected: '+(d.detections[0]?.label||'nothing'),'ok');
+  }catch(e){log('Box detect failed: '+e.message,'err')}
+}
+
+// ---- Show detections ----
+const DET_COLORS=['#ff3c3c','#3cdc78','#3c78ff','#ffc828','#dc3cdc','#3cdcdc','#ff8c28','#8cff28','#288cff'];
+let _currentDets=[];
+let _persistentOverlay=false;  // true: draw bboxes over every live frame
+
+// Render the server's pending set rather than the response of whichever
+// detect just ran. The response is deliberately per-call -- a text detect
+// reports what IT found and must not claim credit for earlier annotations --
+// but the strip is meant to show everything that will actually execute. Using
+// the response made every text detect look like it had wiped the click and box
+// work, when the server had kept it all along.
+// Last annotated frame any detect returned, so the approval modal has a
+// preview to show when a run reuses detections instead of making new ones.
+let _lastAnnotatedB64='';
+
+async function refreshDets(fallback){
+  try{
+    const cur=await api('GET','/api/detections',null);
+    const all=(cur&&cur.detections)||[];
+    showDets(all);
+    return all;
+  }catch(e){
+    if(fallback) showDets(fallback);
+    return fallback||[];
+  }
+}
+
+function showDets(dets){
+  _currentDets=dets;
+  // Persistent overlay: keep masks visible on every live frame so the
+  // operator can switch RGB/IR/Depth without losing the detections.
+  // Cleared by clicking the image or running a new detection.
+  _persistentOverlay = (dets && dets.length > 0);
+  const strip=document.getElementById('det-strip');
+  const items=document.getElementById('det-items');
+  const count=document.getElementById('det-count');
+  strip.style.display='block';count.textContent=dets.length;items.innerHTML='';
+  dets.forEach((d,i)=>{
+    const pos=d.position_3d?d.position_3d.map(v=>v.toFixed(2)).join(','):'';
+    const el=document.createElement('div');el.className='det-chip fade';
+    el.style.animationDelay=i*40+'ms';
+    el.innerHTML=`<span class="det-swatch" style="background:${DET_COLORS[i%9]}"></span>`
+      +`<span class="det-name">${esc(d.label)}</span>`
+      +`<span class="det-conf">${Math.round(d.confidence*100)}%</span>`
+      +(d.camera?`<span class="det-pos">${d.camera}</span>`:'')
+      +(pos?`<span class="det-pos">[${pos}]</span>`:'')
+      // Discard control on the chip itself. One bad detection used to force a
+      // full re-detect, which threw away every good one along with it -- and
+      // now that click/box/text accumulate, pruning is the other half of that.
+      +`<span class="det-x" title="Discard this detection" role="button">&#128465;</span>`;
+    el.addEventListener('mouseenter',()=>highlightDet(i));
+    el.addEventListener('mouseleave',clearHighlight);
+    const x=el.querySelector('.det-x');
+    if(x) x.addEventListener('click',ev=>{ev.stopPropagation();dropDetChip(d.label);});
+    items.appendChild(el);
+  });
+}
+
+// Drop one detection from the server's pending set, then re-render from what
+// the server says is actually left rather than trusting the local edit.
+async function dropDetChip(label){
+  try{
+    await api('POST','/api/detections/drop',{labels:[label]});
+    const cur=await api('GET','/api/detections',null);
+    const left=(cur&&cur.detections)||[];
+    log('Discarded detection: '+label+' ('+left.length+' left)','inf');
+    if(left.length) showDets(left);
+    else{
+      _currentDets=[];_persistentOverlay=false;
+      const strip=document.getElementById('det-strip');
+      const items=document.getElementById('det-items');
+      const count=document.getElementById('det-count');
+      if(items)items.innerHTML='';
+      if(count)count.textContent='0';
+      if(strip)strip.style.display='none';
+    }
+  }catch(e){log('Could not discard '+label+': '+e.message,'err')}
+}
+
+function highlightDet(idx){
+  const d=_currentDets[idx];
+  if(!d) return;
+  // Pause live feed while hovering so overlay is visible
+  if(liveFeedRunning) stopLiveFeed();
+  const img=document.getElementById('cam-img');
+  const canvas=document.getElementById('overlay-canvas');
+  if(!img||!canvas||img.style.display==='none') return;
+
+  const rect=img.getBoundingClientRect();
+  const natW=img.naturalWidth;
+  const natH=img.naturalHeight;
+  if(!natW||!natH) return;
+
+  // object-fit:contain, compute actual rendered area
+  const imgAspect=natW/natH;
+  const boxAspect=rect.width/rect.height;
+  let rw,rh,ox,oy;
+  if(imgAspect>boxAspect){
+    rw=rect.width; rh=rect.width/imgAspect;
+    ox=0; oy=(rect.height-rh)/2;
+  } else {
+    rh=rect.height; rw=rect.height*imgAspect;
+    oy=0; ox=(rect.width-rw)/2;
+  }
+
+  canvas.width=rect.width;
+  canvas.height=rect.height;
+  canvas.style.display='block';
+  canvas.style.pointerEvents='none';
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const color=DET_COLORS[idx%9];
+
+  // The annotated image is tiled (side|bird|wrist). We need to draw a
+  // pulsing highlight around the detection's region in its source camera tile.
+  // For now, draw a large label + crosshair at the detection's centroid
+  // mapped through the tile layout.
+
+  // Use tiled_bbox (already in tiled image pixel coords) for hover
+  const tb=d.tiled_bbox;
+  if(tb){
+    const [x1,y1,x2,y2]=tb;
+    const sx=rw/natW, sy=rh/natH;
+    const bx=ox+x1*sx, by=oy+y1*sy, bw=(x2-x1)*sx, bh=(y2-y1)*sy;
+
+    // Glow highlight
+    ctx.shadowColor=color;
+    ctx.shadowBlur=12;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=3;
+    ctx.strokeRect(bx,by,bw,bh);
+    ctx.shadowBlur=0;
+
+    // Label
+    ctx.font='bold 14px monospace';
+    const label=d.label+' '+Math.round(d.confidence*100)+'%'+(d.camera?' ('+d.camera+')':'');
+    const tw=ctx.measureText(label).width;
+    ctx.fillStyle=color;
+    ctx.fillRect(bx,Math.max(0,by-20),tw+10,20);
+    ctx.fillStyle='#000';
+    ctx.fillText(label,bx+5,Math.max(14,by-5));
+
+    // Crosshair at center
+    const ccx=bx+bw/2, ccy=by+bh/2;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(ccx-12,ccy);ctx.lineTo(ccx+12,ccy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ccx,ccy-12);ctx.lineTo(ccx,ccy+12);ctx.stroke();
+    ctx.beginPath();ctx.arc(ccx,ccy,8,0,Math.PI*2);ctx.stroke();
+  }
+}
+
+function redrawPersistentOverlay(){
+  // Redraw all current detections as bbox + label overlays on top of
+  // whatever live frame is showing. Survives mode switches because the
+  // detection data is kept client-side. Called from the live-feed tick
+  // whenever a new frame paints.
+  if(!_persistentOverlay || !_currentDets || _currentDets.length === 0) return;
+  const img=document.getElementById('cam-img');
+  const canvas=document.getElementById('overlay-canvas');
+  if(!img || !canvas || img.style.display === 'none') return;
+  const rect=img.getBoundingClientRect();
+  const natW=img.naturalWidth, natH=img.naturalHeight;
+  if(!natW || !natH) return;
+  const imgAspect=natW/natH;
+  const boxAspect=rect.width/rect.height;
+  let rw,rh,ox,oy;
+  if(imgAspect>boxAspect){
+    rw=rect.width; rh=rect.width/imgAspect;
+    ox=0; oy=(rect.height-rh)/2;
+  } else {
+    rh=rect.height; rw=rect.height*imgAspect;
+    oy=0; ox=(rect.width-rw)/2;
+  }
+  canvas.width=rect.width; canvas.height=rect.height;
+  canvas.style.display='block';
+  canvas.style.pointerEvents='none';
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const sx=rw/natW, sy=rh/natH;
+  _currentDets.forEach((d, idx) => {
+    const tb=d.tiled_bbox;
+    if(!tb) return;
+    const [x1,y1,x2,y2]=tb;
+    const bx=ox+x1*sx, by=oy+y1*sy, bw=(x2-x1)*sx, bh=(y2-y1)*sy;
+    const color=DET_COLORS[idx%9];
+    ctx.shadowColor=color; ctx.shadowBlur=8;
+    ctx.strokeStyle=color; ctx.lineWidth=2;
+    ctx.strokeRect(bx,by,bw,bh);
+    ctx.shadowBlur=0;
+    const label=d.label+' '+Math.round(d.confidence*100)+'%';
+    ctx.font='bold 12px monospace';
+    const tw=ctx.measureText(label).width;
+    ctx.fillStyle=color;
+    ctx.fillRect(bx,Math.max(0,by-18),tw+8,18);
+    ctx.fillStyle='#000';
+    ctx.fillText(label,bx+4,Math.max(13,by-5));
+  });
+}
+
+function clearPersistentOverlay(){
+  _persistentOverlay=false;
+  const canvas=document.getElementById('overlay-canvas');
+  if(canvas){
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    canvas.style.display='none';
+  }
+}
+
+function clearHighlight(){
+  const canvas=document.getElementById('overlay-canvas');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  canvas.style.display='none';
+  // Resume live feed if not showing detection
+  if(!_showingDetection && !liveFeedRunning) startLiveFeed();
+}
+
+// ---- Plan ----
+async function doPlan(){
+  const instr=document.getElementById('in-instr').value.trim();
+  if(!instr){toast('Enter instruction','err');return}
+  setStep('plan');log('Planning: "'+instr+'"','inf');
+  try{
+    const p=tags.length?tags:null;
+    const d=await api('POST','/api/plan',{instruction:instr,prompts:p});
+    document.getElementById('sec-plan').style.display='block';
+    document.getElementById('plan-out').innerHTML=hlYaml(d.plan_yaml);
+    if(d.detections) showDets(d.detections);
+    log('Plan generated','ok');toast('Plan ready','ok');
+  }catch(e){log('Plan failed: '+e.message,'err')}
+}
+
+// ---- Execute with Approval ----
+let _approvalOverlayMode = 'mask'; // 'mask', 'bbox', 'grasp'
+let _approvalMerged = false; // false=raw detections, true=merged
+let _approvalCamIdx = -1; // -1=scene cam, 0+=per-camera index
+let _approvalData = null;
+
+// Skip detection entirely and plan against state.pending_detections as it
+// stands. This is the path for a hand-annotated scene: a click or a box has
+// already put its detection in the pending set, and re-detecting would throw
+// that work away.
+async function doExecKeep(dry){
+  const instr=document.getElementById('in-instr').value.trim();
+  if(!instr){toast('Enter instruction','err');return}
+  let cur;
+  try{cur=await api('GET','/api/detections',null)}
+  catch(e){log('Could not read detections: '+e.message,'err');return}
+  const dets=(cur&&cur.detections)||[];
+  if(!dets.length){
+    log('Nothing detected yet -- click, box, or run Execute Pipeline first.','err');
+    toast('No detections to reuse','err');return;
+  }
+  log('Reusing '+dets.length+' detection(s) without re-detecting:','inf');
+  dets.forEach(d=>{
+    const p=d.position_3d?`(${d.position_3d.map(v=>v.toFixed(3)).join(', ')})`:'N/A';
+    log(`  ${d.label}: ${(d.confidence*100).toFixed(0)}% pos=${p}`,'inf');
+  });
+  // Approve first. Skipping detection is not a reason to skip the operator's
+  // look at what is about to run -- and with click/box/text now accumulating,
+  // the pending set can legitimately hold something detected several actions
+  // ago that no longer belongs in the scene. The modal is where that gets seen
+  // and discarded before the robot moves.
+  _approvalData={instruction:instr,dry:dry,data:{
+    detections:dets,
+    prompts:dets.map(x=>x.label),
+    raw_count:dets.length,
+    merged_count:dets.length,
+    mask_image:(_lastAnnotatedB64||''),
+  }};
+  _approvalCamIdx=-1;_approvalMerged=false;
+  _showApprovalModal(_approvalData.data);
+}
+
+async function doExec(dry){
+  const instr=document.getElementById('in-instr').value.trim();
+  if(!instr){toast('Enter instruction','err');return}
+  setStep('exec');log('"'+instr+'": detecting...','inf');
+  toast('Detecting objects...','inf');
+
+  // Step 1: Detect and show for approval
+  try{
+    const p=tags.length?tags:null;
+    const useIr=document.getElementById('opt-detect-ir')?.checked||false;
+    const d=await api('POST','/api/detect_approve',{instruction:instr,prompts:p,use_ir:useIr});
+    _approvalData={instruction:instr,dry:dry,data:d};_approvalCamIdx=-1;_approvalMerged=false;
+    log('Detected '+d.detections.length+' objects. Approve to continue.','ok');
+    d.detections.forEach(det=>{
+      const pos=det.position_3d?`(${det.position_3d[0].toFixed(3)}, ${det.position_3d[1].toFixed(3)}, ${det.position_3d[2].toFixed(3)})`:'N/A';
+      log(`  ${det.label}: ${(det.confidence*100).toFixed(0)}% pos=${pos}`,'inf');
+    });
+    _showApprovalModal(d);
+  }catch(e){
+    log('Detection failed: '+e.message,'err');toast('Detection failed','err');
+  }
+}
+
+function _showApprovalModal(d){
+  // Remove existing modal if any
+  let m=document.getElementById('approval-modal');
+  if(m)m.remove();
+
+  m=document.createElement('div');
+  m.id='approval-modal';
+  m.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;padding:20px;overflow-y:auto';
+  m.innerHTML=`
+    <div style="color:#fff;font-size:18px;margin-bottom:10px">Detection Approval</div>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <button onclick="_setOverlay('mask')" id="btn-ov-mask" style="padding:6px 16px;border:2px solid #4af;background:#222;color:#fff;border-radius:4px;cursor:pointer;font-weight:bold">Masks</button>
+      <button onclick="_setOverlay('bbox')" id="btn-ov-bbox" style="padding:6px 16px;border:2px solid #666;background:#222;color:#fff;border-radius:4px;cursor:pointer">Bboxes</button>
+      <button onclick="_setOverlay('grasp')" id="btn-ov-grasp" style="padding:6px 16px;border:2px solid #666;background:#222;color:#fff;border-radius:4px;cursor:pointer">Grasp Preview</button>
+      <span style="color:#666;margin:0 8px;line-height:36px">|</span>
+      <button onclick="_toggleMerged()" id="btn-ov-merged" style="padding:6px 16px;border:2px solid #666;background:#222;color:#fff;border-radius:4px;cursor:pointer">Show Merged</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <button onclick="_prevCam()" style="padding:4px 12px;background:#333;color:#fff;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:16px">◀</button>
+      <span style="color:#aaa;font-size:13px" id="cam-label">Scene (${d.raw_count} raw -> ${d.merged_count} merged)</span>
+      <button onclick="_nextCam()" style="padding:4px 12px;background:#333;color:#fff;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:16px">▶</button>
+    </div>
+    <div style="position:relative;display:inline-block">
+      <img id="approval-img" style="max-width:90vw;max-height:60vh;border:2px solid #444;border-radius:8px" src="data:image/jpeg;base64,${d.mask_image}">
+      <div id="det-tooltip" style="position:fixed;display:none;background:#111;color:#fff;padding:8px 12px;border-radius:6px;border:1px solid #4af;font-size:13px;pointer-events:none;z-index:10001;white-space:nowrap;font-family:monospace"></div>
+    </div>
+    <div style="color:#aaa;font-size:13px;margin:10px 0">${d.detections.length} detections: ${d.prompts.join(', ')}</div>
+    <!-- One row per detection with a discard control. A single bad detection
+         used to force a full re-detect, which threw away every good one with
+         it; dropping one is the cheap correction. -->
+    <div id="det-rows" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;max-height:22vh;overflow-y:auto;width:min(90vw,620px)"></div>
+    <div style="display:flex;align-items:center;gap:8px;color:#aaa;font-size:13px;margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Record this autonomous run as a VLA training demonstration: images + proprio + commanded action at 15 Hz, in the same on-disk schema as the human teleop episodes.">
+        <input type="checkbox" id="chk-record-demo" style="cursor:pointer">
+        <span>Record as training demo</span>
+      </label>
+      <span id="plan-source-tag" style="color:#666;font-family:monospace"></span>
+      <!-- Read-only echo of the RF-DETR switch in the Actions panel: which
+           second-opinion mode produced the confidences shown above. -->
+      <span id="approval-proposer-tag" style="color:#666;font-family:monospace"></span>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+      <button onclick="_approveAndExecute()" style="padding:10px 30px;background:#2a2;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer">Approve & Execute</button>
+      <button onclick="_approveAndExecute(true)" style="padding:10px 30px;background:#a80;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer">Dry Run</button>
+      <button onclick="_startTeleopRecord()" style="padding:10px 30px;background:#4a6;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer" title="Use detections as scene; teleop the robot (D-pad/keyboard); record an operator demo in the same schema as an autonomous one">Teleop Demo</button>
+      <button onclick="document.getElementById('approval-modal').remove()" style="padding:10px 30px;background:#a22;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer">Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(m);
+  _renderDetRows();
+
+  // BT cache pre-flight: will this task be served from the library, or will
+  // it call the planner? Dry run only -- no planning, no detection, no robot.
+  // Worth knowing BEFORE committing a scene reset to a run whose plan will
+  // not be reproducible.
+  (async()=>{
+    const tag=document.getElementById('plan-source-tag');
+    const instr=(_approvalData&&_approvalData.instruction)||'';
+    if(!tag||!instr)return;
+    try{
+      const r=await(await fetch('/api/bt/resolve?instruction='+encodeURIComponent(instr))).json();
+      const hit=(r.results||[])[0];
+      if(!hit)return;
+      if(hit.cached){
+        tag.textContent='BT: '+hit.plan_source+' '+(hit.hash||'')+
+          ' (success '+(hit.success||0)+'/fail '+(hit.fail||0)+')';
+        tag.style.color='#4a6';
+      }else{
+        tag.textContent='BT: cache MISS - '+(hit.detail||'will call the planner');
+        tag.style.color='#a80';
+      }
+    }catch(e){/* pre-flight only; never block approval on it */}
+  })();
+
+  // Which second-opinion mode the confidences above were fused under.
+  (async()=>{
+    const tag=document.getElementById('approval-proposer-tag');
+    if(!tag)return;
+    try{
+      const s=await api('GET','/api/perception/fusion_status');
+      if(s.available===false)return;
+      tag.textContent='RF-DETR: '+(s.mode||'?')+
+        ' ('+(s.fusion_enabled?(s.loaded_backend||s.backend||'none'):'gate off')+')';
+      _renderProposerStatus(s);
+    }catch(e){/* display only */}
+  })();
+
+  // Tooltip: hover over detections to see real-world position
+  const _aimg=document.getElementById('approval-img');
+  const _ttip=document.getElementById('det-tooltip');
+  _aimg.addEventListener('mousemove',function(e){
+    const rect=_aimg.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const sx=_aimg.naturalWidth/rect.width, sy=_aimg.naturalHeight/rect.height;
+    const ix=mx*sx, iy=my*sy;
+    // Pick detection set based on current view
+    const dets=_getTooltipDetections();
+    let closest=null, minD=Infinity;
+    for(const det of dets){
+      if(!det.centroid_2d)continue;
+      const dx=ix-det.centroid_2d[0], dy=iy-det.centroid_2d[1];
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<minD){minD=dist;closest=det}
+    }
+    if(closest&&minD<60){
+      const p=closest.position_3d;
+      const pos=p?`X:${p[0].toFixed(3)} Y:${p[1].toFixed(3)} Z:${p[2].toFixed(3)}`:'N/A';
+      _ttip.innerHTML=`<b style="color:#4af">${closest.label}</b> (${(closest.confidence*100).toFixed(0)}%)<br>${pos}`;
+      _ttip.style.display='block';
+      _ttip.style.left=(e.clientX+14)+'px';
+      _ttip.style.top=(e.clientY-10)+'px';
+    }else{_ttip.style.display='none'}
+  });
+  _aimg.addEventListener('mouseleave',function(){_ttip.style.display='none'});
+}
+
+function _getTooltipDetections(){
+  const d=_approvalData.data;
+  const cams=d.cam_names||[];
+  if(_approvalCamIdx===-1){
+    return _approvalMerged?d.detections:(d.raw_detections||d.detections);
+  }else{
+    const camName=cams[_approvalCamIdx];
+    const camData=(d.per_cam||{})[camName];
+    return camData&&camData.detections?camData.detections:[];
+  }
+}
+
+function _setOverlay(mode){
+  _approvalOverlayMode=mode;
+  _updateApprovalImg();
+  ['mask','bbox','grasp'].forEach(m=>{
+    const b=document.getElementById('btn-ov-'+m);
+    if(b)b.style.borderColor=m===mode?'#4af':'#666';
+  });
+}
+
+function _toggleMerged(){
+  _approvalMerged=!_approvalMerged;
+  const b=document.getElementById('btn-ov-merged');
+  if(b){b.textContent=_approvalMerged?'Show Raw':'Show Merged';b.style.borderColor=_approvalMerged?'#4af':'#666'}
+  _updateApprovalImg();
+}
+
+function _prevCam(){
+  const d=_approvalData.data;
+  const cams=d.cam_names||[];
+  // -1=scene, 0..n=per-camera
+  _approvalCamIdx--;
+  if(_approvalCamIdx<-1)_approvalCamIdx=cams.length-1;
+  _updateApprovalImg();
+}
+function _nextCam(){
+  const d=_approvalData.data;
+  const cams=d.cam_names||[];
+  _approvalCamIdx++;
+  if(_approvalCamIdx>=cams.length)_approvalCamIdx=-1;
+  _updateApprovalImg();
+}
+
+function _updateApprovalImg(){
+  const d=_approvalData.data;
+  const img=document.getElementById('approval-img');
+  const label=document.getElementById('cam-label');
+  const m=_approvalOverlayMode;
+  const cams=d.cam_names||[];
+
+  if(_approvalCamIdx===-1){
+    // Scene view (raw or merged)
+    const key=_approvalMerged?m+'_merged':m+'_image';
+    img.src='data:image/jpeg;base64,'+(d[key]||d[m+'_image']);
+    label.textContent=(_approvalMerged?'Merged':'Scene')+' ('+d.raw_count+' raw -> '+d.merged_count+' merged)';
+  }else{
+    // Per-camera view
+    const camName=cams[_approvalCamIdx];
+    const camData=(d.per_cam||{})[camName];
+    if(camData){
+      img.src='data:image/jpeg;base64,'+camData[m];
+      label.textContent=camName+' ('+camData.count+' detections)';
+    }else{
+      label.textContent=camName+' (no data)';
+    }
+  }
+}
+
+// Operator-driven demo recording. Same recorder, same on-disk schema and
+// same data root as an autonomous run recorded via the "Record as training
+// demo" checkbox -- the only difference is who drives the arm, which is the
+// whole point of the human-vs-SPARK comparison.
+//
+// The task string NAMES the episode directory, so unlike the old flow it is
+// collected at START, not at stop. Keep it verbatim and identical across
+// episodes of the same task or they land in separate folders.
+async function _startTeleopRecord(){
+  const m=document.getElementById('approval-modal');
+  const ad=_approvalData;
+  const task=prompt('Task string (names the episode folder; keep it identical across episodes):',
+                    (ad&&ad.instruction)||'');
+  if(task===null){return}          // operator cancelled; leave the modal up
+  if(!task.trim()){log('Task string is required: it names the episode folder','err');return}
+  if(m)m.remove();
+  log('Starting teleop recording: drive the robot with the D-pad/keys, then click STOP.','inf');
+  toast('Teleop recording...','inf',5000);
+  _showingDetection=false;
+  startLiveFeed();
+  document.getElementById('cam-tag').textContent='TELEOP REC...';
+  try{
+    const d=await api('POST','/api/vla_record/start',{mode:'teleop',task:task,prompt:task});
+    if(!d||!d.started){log('vla_record start failed: '+(d&&d.error||'?'),'err');return}
+    log('Recording episode '+d.episode_id+' @ '+d.record_hz+' Hz to '+d.episode_dir,'ok');
+    // Floating stop button, visible until operator clicks it.
+    const bar=document.createElement('div');
+    bar.id='teleop-rec-bar';
+    bar.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:10000;background:#922;color:#fff;padding:10px 20px;border-radius:8px;border:2px solid #c44;box-shadow:0 4px 12px rgba(0,0,0,0.4);font-size:15px;display:flex;align-items:center;gap:14px';
+    bar.innerHTML=`
+      <span class="rec-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fff"></span>
+      <span>Recording ${d.task} &mdash; episode ${d.episode_id} @ ${d.record_hz} Hz</span>
+      <button onclick="_stopTeleopRecord(true)" style="padding:6px 16px;background:#2a2;border:0;border-radius:4px;color:#fff;cursor:pointer;font-size:14px">Stop &amp; SAVE</button>
+      <button onclick="_stopTeleopRecord(false)" style="padding:6px 16px;background:#666;border:0;border-radius:4px;color:#fff;cursor:pointer;font-size:14px">Stop &amp; discard</button>
+    `;
+    document.body.appendChild(bar);
+  }catch(e){log('vla_record error: '+e,'err')}
+}
+async function _stopTeleopRecord(asSuccess){
+  const bar=document.getElementById('teleop-rec-bar');
+  if(bar)bar.remove();
+  document.getElementById('cam-tag').textContent='live';
+  try{
+    // Discard on a failed attempt rather than saving success=false: the
+    // human corpus is success-only, so a kept failure would confound the
+    // matched comparison.
+    const d=await api('POST','/api/vla_record/stop',{success:asSuccess,discard:!asSuccess});
+    if(d&&d.saved){
+      const ep=d.episode||{};
+      log('Episode saved: '+(ep.episode_dir||'?')+' ('+(ep.num_frames||0)+' frames @ '+
+          (ep.actual_fps||0)+' Hz)','ok');
+      toast('Episode saved','ok',5000);
+    }else if(d&&d.discarded){
+      log('Episode discarded','inf');toast('Discarded','inf',4000);
+    }else{log('vla_record stop returned: '+JSON.stringify(d),'inf')}
+  }catch(e){log('vla_record stop error: '+e,'err')}
+}
+
+// ---- Viser-IK teleop (external robots_realtime subprocess) ----
+// On Start: SPARK releases the FCI, spawns rr-session in its own uv
+// venv, and opens the viser gizmo URL in a new tab. On Stop: SIGTERM
+// the subprocess and reconnect SPARK's driver.
+async function _viserTeleopStart(){
+  const startBtn=document.getElementById('viser-teleop-start-btn');
+  const stopBtn=document.getElementById('viser-teleop-stop-btn');
+  const status=document.getElementById('viser-teleop-status');
+  if(startBtn)startBtn.disabled=true;
+  if(status)status.textContent='Starting viser teleop subprocess...';
+  log('Viser teleop: releasing FCI + spawning rr-session','inf');
+  try{
+    // Stop the SPARK teleop tick so its 30 Hz POST stream doesn't
+    // collide with the handoff window.
+    if(typeof teleopInterval!=='undefined'&&teleopInterval){
+      clearInterval(teleopInterval);teleopInterval=null;
+    }
+    const d=await api('POST','/api/teleop/viser/start',{});
+    if(!d||d.error){
+      log('viser teleop start failed: '+(d&&d.error||'?'),'err');
+      if(d&&d.log_tail)log('rr-session log tail:\n'+d.log_tail,'err');
+      if(status)status.textContent='Failed: '+(d&&d.error||'unknown');
+      if(startBtn)startBtn.disabled=false;
+      return;
+    }
+    log('Viser teleop running pid='+d.pid+' '+d.viser_url,'ok');
+    if(status)status.innerHTML='● Running: <a href="'+d.viser_url+'" target="_blank" style="color:var(--cyan)">open gizmo</a>';
+    if(startBtn)startBtn.style.display='none';
+    if(stopBtn)stopBtn.style.display='block';
+    // Open in a new tab automatically; user can dismiss if undesired.
+    try{window.open(d.viser_url,'_blank','noopener')}catch(_){}
+  }catch(e){
+    log('viser teleop start error: '+e,'err');
+    if(status)status.textContent='Error: '+e;
+    if(startBtn)startBtn.disabled=false;
+  }
+}
+async function _viserTeleopStop(){
+  const startBtn=document.getElementById('viser-teleop-start-btn');
+  const stopBtn=document.getElementById('viser-teleop-stop-btn');
+  const status=document.getElementById('viser-teleop-status');
+  if(stopBtn)stopBtn.disabled=true;
+  if(status)status.textContent='Stopping viser teleop...';
+  log('Viser teleop: SIGTERM subprocess + reclaiming FCI','inf');
+  try{
+    const d=await api('POST','/api/teleop/viser/stop',{});
+    if(d&&d.success){
+      log('Viser teleop stopped (exit='+d.subprocess_exit_code+') reclaimed='+d.reclaimed,'ok');
+      if(status)status.textContent='Stopped, SPARK has FCI';
+    }else{
+      log('viser teleop stop returned: '+JSON.stringify(d),'inf');
+      if(status)status.textContent='Stop returned: '+JSON.stringify(d);
+    }
+  }catch(e){
+    log('viser teleop stop error: '+e,'err');
+    if(status)status.textContent='Error: '+e;
+  }finally{
+    if(stopBtn){stopBtn.disabled=false;stopBtn.style.display='none'}
+    if(startBtn){startBtn.disabled=false;startBtn.style.display='block'}
+  }
+}
+
+// ---- BT Library panel ------------------------------------------------------
+// Cached behaviour-trees from prior successful runs. Operator can:
+//   - flip the "Use Gemini / Use Cached BT" toggle (runtime override
+//     for SPARK_DISABLE_LLM; UI > env > default OFF).
+//   - pin a specific BT for the NEXT /api/execute (single-shot,
+//     auto-clears server-side once pipeline.plan() consumes it).
+//   - promote (★) entries so the planner always sees them as few-shot
+//     examples regardless of jaccard similarity to the new instruction.
+//   - delete entries that were bad.
+// Polls /api/bt/list + /api/bt/cache_status every 10s; re-renders only
+// when the content hash changes so the scroll position is preserved.
+let _btLibEntries = [];
+let _btLibStatus = {enabled:false,source:'default'};
+let _btLibPinned = null;
+let _btLibExpanded = new Set();
+let _btLibCollapsed = false;
+let _btLibLastHash = '';
+function _btLibToggleCollapse(){
+  _btLibCollapsed = !_btLibCollapsed;
+  const body = document.getElementById('bt-lib-body');
+  const ind = document.getElementById('bt-lib-collapse-ind');
+  if(body) body.style.display = _btLibCollapsed ? 'none' : '';
+  if(ind) ind.textContent = _btLibCollapsed ? '▸' : '▾';
+}
+function _btLibHashContent(){
+  // Cheap content hash so we skip re-renders when nothing changed.
+  return JSON.stringify({
+    n: _btLibEntries.length,
+    e: _btLibStatus,
+    p: _btLibPinned,
+    h: _btLibEntries.map(e => e.hash + '|' + (e.promoted?1:0) + '|' + (e.success||0))
+  });
+}
+async function _btLibRefresh(){
+  try{
+    const [list, status] = await Promise.all([
+      api('GET','/api/bt/list'),
+      api('GET','/api/bt/cache_status'),
+    ]);
+    _btLibEntries = (list && list.entries) || [];
+    _btLibPinned = (list && list.pinned) || null;
+    _btLibStatus = status || {enabled:false,source:'default'};
+    const h = _btLibHashContent();
+    if(h !== _btLibLastHash){
+      _btLibLastHash = h;
+      _btLibRender();
+    }
+  }catch(e){
+    // Server may be mid-boot; stay quiet on transient errors.
+  }
+}
+function _btLibRender(){
+  // Toggle button reflects the resolved state (UI > env > default).
+  const btn = document.getElementById('bt-lib-toggle-btn');
+  const src = document.getElementById('bt-lib-source');
+  const count = document.getElementById('bt-lib-count');
+  if(count) count.textContent = '(' + _btLibEntries.length + ')';
+  if(btn){
+    if(_btLibStatus.enabled){
+      btn.textContent = 'ok Using Cached BT';
+      btn.style.background = 'var(--cyan-15)';
+      btn.style.borderColor = 'var(--cyan-30)';
+      btn.style.color = 'var(--cyan)';
+    }else{
+      btn.textContent = 'Using Gemini (LLM)';
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }
+  }
+  if(src){
+    src.textContent = 'source: ' + (_btLibStatus.source || '?');
+  }
+  // Pin banner
+  const pinBanner = document.getElementById('bt-lib-pin-banner');
+  const pinText = document.getElementById('bt-lib-pin-text');
+  if(_btLibPinned){
+    const e = _btLibEntries.find(x => x.hash === _btLibPinned);
+    if(pinBanner) pinBanner.style.display = '';
+    if(pinText){
+      const lbl = e ? e.instruction : _btLibPinned;
+      pinText.textContent = 'pinned: ' + (lbl.length > 50 ? lbl.slice(0,50)+'...' : lbl);
+    }
+  }else{
+    if(pinBanner) pinBanner.style.display = 'none';
+  }
+  // List
+  const list = document.getElementById('bt-lib-list');
+  const q = (document.getElementById('bt-lib-search')||{}).value || '';
+  const qLower = q.trim().toLowerCase();
+  const filtered = qLower
+    ? _btLibEntries.filter(e => (e.instruction||'').toLowerCase().includes(qLower))
+    : _btLibEntries;
+  if(!list) return;
+  if(!filtered.length){
+    list.innerHTML = '<div style="padding:8px;color:var(--tx-3);font:400 10px var(--mono);text-align:center">' + (_btLibEntries.length ? 'no matches' : 'library is empty') + '</div>';
+    return;
+  }
+  const rows = filtered.map(e => {
+    const isPinned = e.hash === _btLibPinned;
+    const instr = e.instruction || '(no instruction)';
+    const instrTrunc = instr.length > 60 ? instr.slice(0,60)+'...' : instr;
+    const expanded = _btLibExpanded.has(e.hash);
+    const starChar = e.promoted ? '★' : '☆';
+    const starColor = e.promoted ? '#ffcc40' : 'var(--tx-3)';
+    return (
+      '<div class="bt-lib-row" data-hash="'+e.hash+'" style="border-bottom:1px solid var(--border);padding:6px 8px;'+(isPinned?'background:var(--bg-3);':'')+'">' +
+      '  <div style="display:flex;align-items:center;gap:6px">' +
+      '    <span style="cursor:pointer;color:'+starColor+';font-size:13px;flex:0 0 auto" onclick="_btLibPromote(event,\''+e.hash+'\','+(!e.promoted)+')" title="'+(e.promoted?'Unpromote':'Promote')+' (always-include in planner prompts)">'+starChar+'</span>' +
+      '    <span style="flex:1;cursor:pointer;font:500 11px var(--mono);color:var(--tx-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="_btLibExpand(\''+e.hash+'\')" title="'+_btEsc(instr)+'">'+_btEsc(instrTrunc)+'</span>' +
+      '    <span style="flex:0 0 auto;font:400 9px var(--mono);color:var(--tx-3)">'+e.n_actions+' act</span>' +
+      '    <button class="btn btn-s" style="flex:0 0 auto;padding:2px 6px;font-size:9px;'+(isPinned?'background:var(--cyan-15);color:var(--cyan)':'')+'" onclick="_btLibPin(event,\''+e.hash+'\')" title="Use this BT for the NEXT execute call (single-shot)">'+(isPinned?'Pinned':'Pin')+'</button>' +
+      '    <button class="btn btn-s" style="flex:0 0 auto;padding:2px 6px;font-size:9px;background:#5a2020;color:#ffaaaa" onclick="_btLibDelete(event,\''+e.hash+'\')" title="Delete this BT">Del</button>' +
+      '  </div>' +
+      (expanded ? _btLibRenderDetail(e) : '') +
+      '</div>'
+    );
+  });
+  list.innerHTML = rows.join('');
+}
+function _btEsc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
+}
+function _btLibRenderDetail(e){
+  // Lazy fetch on first expand: list response only has summary fields.
+  // The detail block is rendered from the cached score we fetch in
+  // _btLibExpand and store on the entry object.
+  if(!e._detail) return '<div style="padding:4px 0 4px 22px;font:400 9px var(--mono);color:var(--tx-3)">loading detail...</div>';
+  const d = e._detail;
+  const tree = (d.score && d.score.tree) || {};
+  const labels = [];
+  const actionTypes = [];
+  (function walk(node){
+    if(!node || typeof node !== 'object') return;
+    const p = node.params || {};
+    if(p.keypoint_label && !labels.includes(p.keypoint_label)) labels.push(p.keypoint_label);
+    if(node.type && !['sequence','selector'].includes(node.type)) actionTypes.push(node.type);
+    (node.children||[]).forEach(walk);
+  })(tree);
+  // Predicate labels sit outside the tree; the panel must list them too, or a
+  // tree looks like it needs fewer detections than it actually does.
+  (((d.score && d.score.verify && d.score.verify.all) || [])).forEach(function(pr){
+    if(!pr || typeof pr !== 'object') return;
+    ['obj','container','surface','base','target'].forEach(function(k){
+      if(typeof pr[k] === 'string' && pr[k] && !labels.includes(pr[k])) labels.push(pr[k]);
+    });
+  });
+  const created = d.created_at ? d.created_at.replace('T',' ').slice(0,19) : '?';
+  return (
+    '<div style="padding:4px 0 6px 22px;font:400 9px var(--mono);color:var(--tx-2);line-height:1.5">' +
+    '  <div><span style="color:var(--tx-3)">hash:</span> '+_btEsc(e.hash)+' <span style="color:var(--tx-3)">created:</span> '+_btEsc(created)+'</div>' +
+    '  <div><span style="color:var(--tx-3)">labels:</span> '+_btEsc(labels.join(', ') || '(none)')+'</div>' +
+    '  <div><span style="color:var(--tx-3)">actions ('+actionTypes.length+'):</span> '+_btEsc(actionTypes.join(' -> ') || '(none)')+'</div>' +
+    '  <div><span style="color:var(--tx-3)">success:</span> '+(d.success||0)+' <span style="color:var(--tx-3)">fail:</span> '+(d.fail||0)+'</div>' +
+    '</div>'
+  );
+}
+async function _btLibExpand(hash){
+  if(_btLibExpanded.has(hash)){
+    _btLibExpanded.delete(hash);
+    _btLibRender();
+    return;
+  }
+  _btLibExpanded.add(hash);
+  _btLibRender();
+  // Fetch detail if not cached.
+  const e = _btLibEntries.find(x => x.hash === hash);
+  if(e && !e._detail){
+    try{
+      const d = await api('GET','/api/bt/get?hash=' + encodeURIComponent(hash));
+      if(d && !d.error){
+        e._detail = d;
+        _btLibRender();
+      }
+    }catch(_){}
+  }
+}
+async function _btLibToggleCache(){
+  const newVal = !_btLibStatus.enabled;
+  try{
+    const d = await api('POST','/api/bt/toggle_cache',{enabled:newVal});
+    if(d && typeof d.enabled === 'boolean'){
+      _btLibStatus = d;
+      _btLibLastHash = '';
+      _btLibRender();
+      log('BT library: ' + (d.enabled ? 'using cached BTs' : 'using Gemini') + ' (source=' + d.source + ')', 'inf');
+    }
+  }catch(e){
+    log('bt toggle error: ' + e, 'err');
+  }
+}
+async function _btLibPin(ev, hash){
+  if(ev) ev.stopPropagation();
+  try{
+    const d = await api('POST','/api/bt/select',{hash});
+    if(d && d.pinned){
+      _btLibPinned = d.pinned;
+      _btLibLastHash = '';
+      _btLibRender();
+      log('Pinned BT for next execute: ' + (d.instruction || hash), 'ok');
+    }else if(d && d.error){
+      log('pin failed: ' + d.error, 'err');
+    }
+  }catch(e){
+    log('pin error: ' + e, 'err');
+  }
+}
+async function _btLibUnpin(){
+  try{
+    await api('POST','/api/bt/unpin',{});
+    _btLibPinned = null;
+    _btLibLastHash = '';
+    _btLibRender();
+  }catch(_){}
+}
+async function _btLibPromote(ev, hash, promoted){
+  if(ev) ev.stopPropagation();
+  try{
+    const d = await api('POST','/api/bt/promote',{hash, promoted});
+    if(d && typeof d.promoted === 'boolean'){
+      const e = _btLibEntries.find(x => x.hash === hash);
+      if(e) e.promoted = d.promoted;
+      _btLibLastHash = '';
+      _btLibRender();
+    }
+  }catch(e){
+    log('promote error: ' + e, 'err');
+  }
+}
+async function _btLibDelete(ev, hash){
+  if(ev) ev.stopPropagation();
+  if(!confirm('Delete this cached BT permanently?')) return;
+  try{
+    const r = await fetch(API + '/api/bt/' + encodeURIComponent(hash), {method:'DELETE'});
+    const d = await r.json();
+    if(d && d.deleted){
+      _btLibEntries = _btLibEntries.filter(x => x.hash !== hash);
+      _btLibExpanded.delete(hash);
+      if(_btLibPinned === hash) _btLibPinned = null;
+      _btLibLastHash = '';
+      _btLibRender();
+      log('Deleted BT ' + hash, 'inf');
+    }else if(d && d.error){
+      log('delete failed: ' + d.error, 'err');
+    }
+  }catch(e){
+    log('delete error: ' + e, 'err');
+  }
+}
+// Boot the panel: initial fetch + 10s poll.
+setTimeout(_btLibRefresh, 800);
+setInterval(_btLibRefresh, 10000);
+
+function _renderDetRows(){
+  const box=document.getElementById('det-rows');
+  if(!box||!_approvalData)return;
+  const dets=(_approvalData.data&&_approvalData.data.detections)||[];
+  box.innerHTML=dets.map((det,i)=>{
+    const pos=det.position_3d
+      ?`(${det.position_3d.map(v=>Number(v).toFixed(3)).join(', ')})`:'no 3D';
+    const conf=Math.round((det.confidence||0)*100);
+    // Colour the confidence so a weak detection reads as weak at a glance.
+    const col=conf>=60?'#6c6':(conf>=30?'#ca6':'#c66');
+    return `<div style="display:flex;align-items:center;gap:8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:5px 8px;font-family:monospace;font-size:12px">
+      <span style="color:#fff;flex:0 0 190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${det.label}</span>
+      <span style="color:${col};flex:0 0 42px">${conf}%</span>
+      <span style="color:#888;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pos}</span>
+      <button onclick="_dropDet(${i})" title="Discard this detection" style="flex:0 0 auto;background:#2a1414;color:#e66;border:1px solid #633;border-radius:4px;cursor:pointer;padding:3px 8px;font-size:13px">&#128465;</button>
+    </div>`;
+  }).join('')||'<div style="color:#666;font-size:12px">no detections</div>';
+}
+
+// Drop one detection from the server's pending set, then re-read what is
+// actually left rather than assuming the local edit matched.
+async function _dropDet(i){
+  const dets=(_approvalData&&_approvalData.data&&_approvalData.data.detections)||[];
+  const label=dets[i]?dets[i].label:'?';
+  try{
+    await api('POST','/api/detections/drop',{indices:[i]});
+    const cur=await api('GET','/api/detections',null);
+    _approvalData.data.detections=(cur&&cur.detections)||[];
+    log('Discarded detection: '+label,'inf');
+    _renderDetRows();
+  }catch(e){log('Could not discard '+label+': '+e.message,'err')}
+}
+
+async function _approveAndExecute(dryOverride){
+  // Read the checkbox BEFORE removing the modal it lives in.
+  const recDemo=!!(document.getElementById('chk-record-demo')||{}).checked;
+  const m=document.getElementById('approval-modal');
+  if(m)m.remove();
+  const ad=_approvalData;
+  if(!ad){log('No approval data','err');return}
+  const dry=dryOverride===true?true:(ad.dry||false);
+  if(recDemo&&!dry){log('Recording this run as a training demo','inf')}
+  log((dry?'[DRY] ':'')+'Approved: executing...','inf');
+  toast(dry?'Dry run...':'Executing...','inf');
+  _showingDetection=false;
+  startLiveFeed();
+  document.getElementById('cam-tag').textContent=dry?'DRY RUN...':'EXECUTING...';
+
+  // Progress cursor. `since` is a server-side monotonic sequence number, NOT
+  // an index into the returned array: the buffer trims from the front on long
+  // runs, and the old index-based cursor silently skipped or repeated lines
+  // once it did. Seed it from the DELETE so we never replay pre-run entries.
+  let _progSince=0;
+  try{
+    const c=await(await fetch('/api/progress',{method:'DELETE'})).json();
+    _progSince=c.next_since||0;
+  }catch(e){}
+  // _progBusy: skip a tick if the previous poll is still in flight, so slow
+  // responses cannot stack up setInterval callbacks against the connection pool.
+  let _progBusy=false;
+  let progInterval=setInterval(async()=>{
+    if(_progBusy) return;
+    _progBusy=true;
+    try{
+      const pg=await(await fetch('/api/progress?since='+_progSince)).json();
+      // Render with the server's event time, not the browser's paint time.
+      (pg.log||[]).forEach(en=>log(en.msg,'inf',en.ts));
+      if(pg.next_since!=null) _progSince=pg.next_since;
+    }catch(e){}
+    finally{_progBusy=false}
+  },1000);
+  try{
+    const d=await api('POST','/api/execute_approved',
+      {instruction:ad.instruction,dry_run:dry,record_demo:recDemo&&!dry});
+    clearInterval(progInterval);
+    // Plan provenance. During a collection session "llm" means the BT cache
+    // missed and Gemini was consulted, so this run is not repeatable.
+    if(d.plan_source){
+      log('Plan source: '+d.plan_source+(d.bt_hash?' ('+d.bt_hash+')':''),
+          d.plan_source==='llm'?'inf':'ok');
+    }
+    if(d.demo_episode){
+      const de=d.demo_episode, cf=(de.spark||{}).commanded_action_fraction;
+      // A low commanded fraction means the executor spent the run on the
+      // movej/movel path, where no per-timestep command exists and the
+      // action array is a post-hoc reconstruction. Flag it, don't hide it.
+      log('Demo episode: '+(de.episode_dir||'?')+' ('+(de.num_frames||0)+' frames @ '+
+          (de.actual_fps||0)+' Hz'+
+          (cf!=null?', '+Math.round(cf*100)+'% commanded action':'')+')',
+          (cf!=null&&cf<0.9)?'err':'ok');
+    }
+    if(d.plan_yaml||d.plan){
+      document.getElementById('sec-plan').style.display='block';
+      document.getElementById('plan-out').innerHTML=hlYaml(
+        d.plan_yaml||(typeof d.plan==='string'?d.plan:JSON.stringify(d.plan,null,2)));
+    }
+    if(d.detections) showDets(d.detections);
+    (d.execution_results||[]).forEach(r=>{
+      log('  '+r.action+': '+(r.success?'OK':'FAIL')+' - '+r.message,r.success?'ok':'err');
+    });
+    log('Task '+(d.success?'completed':'failed')+' in '+(d.duration||0).toFixed(1)+'s',d.success?'ok':'err');
+    toast(d.success?'Task done':'Task failed',d.success?'ok':'err',8000);
+    addHist(d);
+    // Episode bundle panel: only shows after a real (non-dry) run
+    // when the recorder produced a cache. Save / Discard buttons
+    // are the only way to retain or trash the bundle, starting the
+    // next task auto-discards.
+    if(d.episode){showEpisodePanel(d.instruction,d.episode,d.success);}
+  }catch(e){
+    clearInterval(progInterval);
+    log('Execution failed: '+e.message,'err');toast('Failed','err',8000);
+  }
+}
+
+// ---- Robot controls ----
+async function jog(dx,dy,dz){
+  try{await api('POST','/api/move_relative',{dx,dy,dz});refreshTcp()}
+  catch(e){log('Jog: '+e.message,'err')}
+}
+async function doHome(){log('Homing...','inf');if(teleopInterval){clearInterval(teleopInterval);teleopInterval=null}heldKeys.clear();try{await api('POST','/api/home');log('Home','ok');refreshTcp()}catch(e){log('Home: '+e.message,'err')}if(teleopActive&&!teleopInterval){teleopInterval=setInterval(teleopTick,33)}}
+
+async function doRecover(){
+  // Clear reflex / protective-stop without moving the arm. Distinct from
+  // doHome (which physically moves to ready pose) and doStop (which only
+  // brakes). Pauses the teleop tick so a held stick doesn't immediately
+  // re-trip the reflex; resumes after the call returns.
+  const wasActive=!!teleopInterval;
+  if(teleopInterval){clearInterval(teleopInterval);teleopInterval=null}
+  try{
+    const r=await api('POST','/api/recover');
+    log('Recovered: '+(r.actions||[]).join(', '),'ok');
+  }catch(e){log('Recover: '+e.message,'err')}
+  if(teleopActive&&wasActive&&!teleopInterval){
+    teleopInterval=setInterval(teleopTick,33);
+  }
+}
+async function grip(a){try{await api('POST','/api/gripper',{action:a});log('Gripper '+a,'ok')}catch(e){log('Gripper: '+e.message,'err')}}
+
+// Streaming variable-width gripper command for analog triggers.
+// Throttle: 100 ms between POSTs AND 0.02 change in target, chosen so
+// the Franka Hand (max 0.1 m/s, ~80 mm range) actually completes one
+// motion before the next supersedes it.  `force=true` bypasses the
+// throttle entirely; used on trigger release to commit a tap's final
+// accumulated target even if shorter than the throttle window.
+let _gripLastSent=1.0;       // 1.0 = closed at rest; opens as left trigger pulls
+let _gripLastSentAt=0;
+function sendGripperPosition(target, force){
+  if(target == null) return;
+  const now=performance.now();
+  if(!force){
+    if(now - _gripLastSentAt < 100) return;
+    if(Math.abs(target - _gripLastSent) < 0.02) return;
+  }
+  _gripLastSent = target;
+  _gripLastSentAt = now;
+  gripperOpen = (target < 0.5);
+  api('POST','/api/gripper_position',{position:target}).catch(()=>{});
+}
+async function testYaw(){log('Running yaw test (0/30/60 deg)...','inf');try{const r=await api('POST','/api/test_yaw');if(r.error){log('Yaw test: '+r.error,'err');return}if(r.results){r.results.forEach(d=>log(`Yaw ${d.yaw_deg} deg: tool_X=${d.tool_X_deg}, tool_Y=${d.tool_Y_deg}`,'ok'))}log('Yaw test done','ok')}catch(e){log('Yaw test: '+e.message,'err')}}
+async function testWristObb(){log('Running wrist OBB...','inf');try{const r=await api('POST','/api/test_wrist_obb');if(r.error){log('Wrist OBB: '+r.error,'err');return}log(`OBB: '${r.label}' img=${r.img_angle_deg} deg, ar=${r.aspect_ratio}`,'ok');log(`Yaw w/ offset: ${r.yaw_with_offset_deg} deg | raw: ${r.yaw_raw_deg} deg`,'inf');if(r.tcp_info)log(`TCP: ${r.tcp_info}`,'inf');if(r.image){let img=document.getElementById('wrist-obb-img');if(!img){img=document.createElement('img');img.id='wrist-obb-img';img.style.cssText='width:100%;border-radius:6px;border:1px solid var(--bd);margin:6px 0';const panel=document.getElementById('right');if(panel)panel.prepend(img)}img.src='data:image/jpeg;base64,'+r.image}}catch(e){log('Wrist OBB: '+e.message,'err')}}
+async function logPose(){try{const r=await api('GET','/api/robot_state');if(r.tcp_pose){const p=r.tcp_pose;log(`TCP: [${p[0].toFixed(3)}, ${p[1].toFixed(3)}, ${p[2].toFixed(3)}] ori=[${p[3].toFixed(3)}, ${p[4].toFixed(3)}, ${p[5].toFixed(3)}]`,'inf');const j=r.joint_positions;if(j){const jd=j.map(v=>(v*180/Math.PI).toFixed(1));log(`Joints (deg): [${jd.join(', ')}]`,'inf')}log(`Gripper pos: ${r.gripper_position}`,'inf')}else{log('No TCP data','err')}}catch(e){log('Pose: '+e.message,'err')}}
+
+// ---- Bimanual handlers (active only when family == bimanual_franka). ----
+async function armGrip(arm, action){
+  try{
+    await api('POST', `/api/bimanual/${arm}/gripper`, {action});
+    log(`${arm} gripper ${action}`, 'ok');
+  }catch(e){ log(`${arm} gripper failed: ${e.message}`, 'err'); }
+}
+async function armHome(arm){
+  try{
+    await api('POST', `/api/bimanual/${arm}/home`);
+    log(`${arm} arm homed`, 'ok'); refreshTcp();
+  }catch(e){ log(`${arm} home failed: ${e.message}`, 'err'); }
+}
+async function armStop(arm){
+  try{
+    // No per-arm stop endpoint by design (safety-stop is global).
+    // Send a zero-velocity tick to brake this arm; global STOP is the
+    // emergency button.
+    await api('POST', `/api/bimanual/${arm}/velocity`,
+              {vx:0,vy:0,vz:0,wrx:0,wry:0,wrz:0,duration:0.1});
+    log(`${arm} braked`, 'inf');
+  }catch(e){ log(`${arm} stop failed: ${e.message}`, 'err'); }
+}
+async function doHandoff(fromArm, toArm){
+  log(`Handoff ${fromArm} -> ${toArm}...`, 'inf');
+  try{
+    const r = await api('POST', '/api/bimanual/handoff',
+                         {from_arm: fromArm, to_arm: toArm});
+    const ok = r.status === 'ok';
+    log(`Handoff ${fromArm}->${toArm}: ${r.status}`, ok ? 'ok' : 'err');
+    if(r.results){ for(const x of r.results) log(`  ${x.action}: ${x.success?'ok':'fail'} ${x.message||''}`, x.success?'ok':'err'); }
+  }catch(e){ log(`Handoff failed: ${e.message}`, 'err'); }
+}
+async function doBimanualHomeBoth(){
+  try{
+    await api('POST', '/api/bimanual/home_both');
+    log('Both arms homed', 'ok'); refreshTcp();
+  }catch(e){ log(`Home both failed: ${e.message}`, 'err'); }
+}
+async function refreshInterArmDistance(){
+  // Soft poll: only fire when the bimanual family is active.
+  if(!document.body.classList.contains('robot-bimanual_franka')) return;
+  try{
+    const r = await api('GET', '/api/bimanual/inter_arm_distance');
+    const el = document.getElementById('bimanual-inter-distance');
+    if(el && typeof r.distance_m === 'number'){
+      const cm = (r.distance_m * 100).toFixed(1);
+      const color = r.distance_m < 0.15 ? 'var(--red)' :
+                    (r.distance_m < 0.20 ? 'var(--amber)' : 'var(--tx-3)');
+      el.innerHTML = `<span style="color:${color}">Inter-arm: ${cm} cm</span>`;
+    }
+  }catch(e){ /* swallow, endpoint 400s for non-bimanual families */ }
+}
+setInterval(refreshInterArmDistance, 1500);
+
+// ---- TM Bag (Pokemon-style learned-primitive popup) ----
+async function showPrimitives(){
+  let r;
+  try{ r = await api('GET', '/api/bimanual/primitives'); }
+  catch(e){ toast('No primitive registry available', 'err'); return; }
+  let panel = document.querySelector('.tm-menu');
+  if(panel) panel.remove();
+  panel = document.createElement('div');
+  panel.className = 'tm-menu';
+  let html = `<button class="tm-close" onclick="this.parentElement.remove()">&#10005;</button>`;
+  html += `<h4>TM BAG: ${r.learned_count}/${r.count} IN LIBRARY</h4>`;
+  html += `<div class="tm-grid">`;
+  for(const p of r.primitives){
+    const cls = p.learned ? 'learned' : 'locked';
+    const subtitle = p.learned
+      ? `&#9733; ${p.successes}/${p.uses} successes`
+      : 'NOT IN LIBRARY';
+    html += `<div class="tm-slot ${cls}" title="${(p.description||'').replace(/"/g,'&quot;')}">
+               <div class="name">${p.name.toUpperCase()}</div>
+               <div class="meta">${subtitle}</div>
+             </div>`;
+  }
+  html += `</div>`;
+  panel.innerHTML = html;
+  document.body.appendChild(panel);
+}
+
+let _anchorMode = false;
+let _anchorPointCount = 0;
+
+function startAnchorPoint(){
+  const btn=document.getElementById('btn-anchor');
+  const status=document.getElementById('anchor-status');
+  const img=document.getElementById('cam-img');
+  if(_anchorMode){
+    _anchorMode=false;
+    img.style.cursor='';
+    document.body.classList.remove('anchor-mode');
+    btn.innerHTML='Add Point';
+    status.textContent='Cancelled.';
+    status.style.color='var(--tx-3)';
+    return;
+  }
+  _anchorMode=true;
+  // Body class drives the CSS crosshair override (wins against any
+  // inline cursor set by the zoom/pan handlers). Inline cursor is kept
+  // as a fallback for browsers that ignore the body-class rule.
+  document.body.classList.add('anchor-mode');
+  img.style.cursor='crosshair';
+  btn.innerHTML='Cancel';
+  status.textContent='Click on the gripper tip in the sideview...';
+  status.style.color='var(--cyan)';
+  log('Anchor: click on gripper tip','inf');
+  toast('Click gripper tip in sideview','inf');
+}
+
+async function computeAnchor(){
+  const status=document.getElementById('anchor-status');
+  status.textContent='Computing transform...';
+  status.style.color='var(--cyan)';
+  try{
+    const d=await api('POST','/api/anchor_compute');
+    if(d.success){
+      const camInfo=Object.entries(d.per_camera||{}).map(([k,v])=>`${k}: ${v.num_points}pts err=${(v.mean_error_m*100).toFixed(1)}cm`).join(', ');
+      status.innerHTML=`Calibrated: ${camInfo}`;
+      status.style.color='var(--green)';
+      log(`Calibration OK: ${camInfo}`, 'ok');
+      toast('Calibration complete!','ok');
+      _anchorPointCount=0;
+    } else {
+      status.textContent=d.error||'Failed';
+      status.style.color='var(--red)';
+    }
+  }catch(e){
+    status.textContent=e.message;status.style.color='var(--red)';
+    log('Compute failed: '+e.message,'err');
+  }
+}
+
+async function doAutoCalibrate(){
+  const btn=document.getElementById('btn-autocalib');
+  const status=document.getElementById('anchor-status');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Calibrating (robot moving)...';
+  status.textContent='Robot is moving to calibration poses... do not touch!';
+  status.style.color='var(--cyan)';
+  log('Auto-calibration started: robot will move to 5 poses','inf');
+  toast('Auto-calibrating, keep workspace clear!','inf');
+  try{
+    const d=await api('POST','/api/auto_calibrate');
+    if(d.success){
+      status.innerHTML=`Auto-calibrated with ${d.num_points} points. Applied to: ${d.applied_to.join(', ')}`;
+      status.style.color='var(--green)';
+      log(`Auto-calibration OK: ${d.num_points} points`,'ok');
+      toast('Calibration complete!','ok');
+    } else {
+      status.textContent=d.error||'Failed';
+      status.style.color='var(--red)';
+      log('Auto-calibration failed: '+(d.error||'unknown'),'err');
+    }
+  }catch(e){
+    status.textContent=e.message;status.style.color='var(--red)';
+    log('Auto-calibration failed: '+e.message,'err');
+    toast('Calibration failed','err');
+  }
+  btn.disabled=false;btn.innerHTML='Auto-Calibrate (robot moves itself)';
+}
+
+async function clearAnchor(){
+  // Destructive: wipes the active family's saved anchor points and the
+  // computed transform from disk, and resets live camera extrinsics to
+  // identity. Confirm so a fat-fingered click doesn't nuke calibration.
+  if(!confirm('Clear all anchor calibration for the active robot?\n\n'+
+              'This deletes the per-family saved points and computed '+
+              'transform from disk and resets camera extrinsics. Other '+
+              'robot families are unaffected. Continue?')){
+    return;
+  }
+  try{
+    const r=await api('POST','/api/anchor_clear');
+    _anchorPointCount=0;
+    document.getElementById('anchor-status').textContent='Cleared. Add 3+ points.';
+    const bits=[];
+    if(r.family) bits.push('family='+r.family);
+    if(r.removed_files && r.removed_files.length) bits.push('removed='+r.removed_files.join(','));
+    if(r.reset_cams && r.reset_cams.length) bits.push('reset='+r.reset_cams.join(','));
+    log('Anchor cleared'+(bits.length?(' ('+bits.join('; ')+')'):''),'ok');
+  }catch(e){
+    log('Anchor clear failed: '+e.message,'err');
+  }
+}
+
+// Anchor click handler on camera image
+document.addEventListener('DOMContentLoaded', function(){
+  const img=document.getElementById('cam-img');
+  if(!img) return;
+  img.addEventListener('click', async function(e){
+    if(!_anchorMode) return;
+    _anchorMode=false;
+    img.style.cursor='';
+    document.body.classList.remove('anchor-mode');
+    const rect=img.getBoundingClientRect();
+    const x=e.clientX-rect.left;
+    const y=e.clientY-rect.top;
+    const imgW=rect.width;
+    const imgH=rect.height;
+
+    const btn=document.getElementById('btn-anchor');
+    const status=document.getElementById('anchor-status');
+    btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Adding...';
+
+    try{
+      const d=await api('POST','/api/anchor_point',{x,y,img_width:imgW,img_height:imgH});
+      _anchorPointCount=d.point_index;
+      const countsStr=Object.entries(d.per_camera_counts||{}).map(([k,v])=>`${k}:${v}`).join(' ');
+      status.innerHTML=`${d.camera} #${d.point_index}: depth=${d.depth.toFixed(3)}m [${countsStr}]<br>${d.message}`;
+      const anyCamReady=Object.values(d.per_camera_counts||{}).some(v=>v>=3);
+      status.style.color=anyCamReady?'var(--green)':'var(--cyan)';
+      log(`Anchor [${d.camera}]: TCP=(${d.tcp_position.map(v=>v.toFixed(3)).join(',')}) ${countsStr}`,'ok');
+      if(anyCamReady) toast(`Ready to Compute! (${countsStr})`,'ok');
+    }catch(e){
+      status.textContent=e.message;status.style.color='var(--red)';
+      log('Add point failed: '+e.message,'err');
+    }
+    btn.disabled=false;btn.innerHTML='Add Point';
+  });
+});
+async function doStop(opts){
+  const silent=!!(opts&&opts.silent);
+  if(!silent) log('EMERGENCY STOP','err');
+  // Belt-and-suspenders: send an immediate zero-velocity BEFORE /api/stop.
+  // Reason: /api/stop calls the driver's stop() which halts the active
+  // motion, but any in-flight CartesianVelocityMotion with duration>0
+  // may still finish out its remaining duration. An explicit zero
+  // velocity tells franky "command zero RIGHT NOW" so even the
+  // remaining duration is a no-op. Fire-and-forget so we don't block
+  // the rest of the stop cleanup.
+  try{
+    api('POST','/api/velocity',{vx:0,vy:0,vz:0,wrx:0,wry:0,wrz:0,duration:0.05}).catch(()=>{});
+  }catch(e){}
+  // Release the sticky-teleop lock and tear down the tick loop so the
+  // STOP/Esc buttons inside the teleop block are the canonical "leave
+  // teleop" path.  Side-effect of any /api/stop call, consistent with
+  // every other reason a user would hit this.
+  teleopLocked=false;
+  teleopActive=false;
+  heldKeys.clear();
+  updateKeyIndicators();
+  if(teleopInterval){clearInterval(teleopInterval);teleopInterval=null}
+  const zone=document.getElementById('teleop-zone');
+  if(zone){
+    zone.style.borderColor='var(--border-hi)';
+    zone.style.borderStyle='dashed';
+    zone.blur();
+  }
+  const st=document.getElementById('teleop-status');
+  if(st) st.textContent='Click to enable teleop';
+  try{
+    await api('POST','/api/stop');
+    if(!silent) toast('Stopped - use FAIL on the episode bar to keep it as a negative','err',5000);
+  }catch(e){}
+}
+// Convert an axis-angle rotvec (x,y,z) to a 3x3 rotation matrix.
+// Rodrigues' formula. Returns a 9-element row-major array for cheap access.
+function _rotvecToMat(rx, ry, rz){
+  const ang = Math.sqrt(rx*rx + ry*ry + rz*rz);
+  if(ang < 1e-9) return [1,0,0, 0,1,0, 0,0,1];
+  const x = rx/ang, y = ry/ang, z = rz/ang;
+  const c = Math.cos(ang), s = Math.sin(ang), C = 1-c;
+  return [
+    c + x*x*C,    x*y*C - z*s, x*z*C + y*s,
+    y*x*C + z*s, c + y*y*C,    y*z*C - x*s,
+    z*x*C - y*s, z*y*C + x*s, c + z*z*C,
+  ];
+}
+
+async function refreshTcp(){
+  try{
+    const s=await api('GET','/api/robot_state');
+    if(s.connected&&s.tcp_pose){
+      document.getElementById('tcp-x').textContent=s.tcp_pose[0].toFixed(4);
+      document.getElementById('tcp-y').textContent=s.tcp_pose[1].toFixed(4);
+      document.getElementById('tcp-z').textContent=s.tcp_pose[2].toFixed(4);
+      // World-frame TCP axis angles + tilt-from-vertical for orientation
+      // self-monitoring during teleop alignment. Decompose the rotvec
+      // and read TCP-X, TCP-Y as their XY-projected world angles.
+      // TCP-Y is the closing axis on Franka Hand (URDF: prismatic finger
+      // joints along hand-Y). Tilt is the angle of TCP-Z from world -Z
+      // (i.e., how much the gripper is off straight-down).
+      const rv = s.tcp_pose.slice(3);
+      const M = _rotvecToMat(rv[0], rv[1], rv[2]);
+      // TCP-X world: column 0
+      const txx = M[0], txy = M[3], txz = M[6];
+      // TCP-Y world: column 1
+      const tyx = M[1], tyy = M[4], tyz = M[7];
+      // TCP-Z world: column 2
+      const tzx = M[2], tzy = M[5], tzz = M[8];
+      const rad = Math.PI/180;
+      const txAng = Math.atan2(txy, txx) / rad;
+      const tyAng = Math.atan2(tyy, tyx) / rad;
+      // Mod 180 (axis-undirected) for the side display
+      const wrap180 = a => { let v = a % 180; if(v < -90) v += 180; if(v > 90) v -= 180; return v; };
+      const tilt = Math.acos(Math.max(-1, Math.min(1, -tzz))) / rad;  // -tzz because we want tilt from -Z
+      const fmt = (v, w) => `${v.toFixed(1)} deg (mod180: ${w.toFixed(1)} deg)`;
+      document.getElementById('tcp-rx').textContent = fmt(txAng, wrap180(txAng));
+      document.getElementById('tcp-ry').textContent = fmt(tyAng, wrap180(tyAng));
+      document.getElementById('tcp-tilt').textContent = `${tilt.toFixed(1)} deg`;
+      // Gripper position uses the normalized 0..1 scale from /api/robot_state
+      // (gripper_position_norm; 0=open, 1=closed). Backstop: if only the raw
+      // Robotiq 0..255 value is present, treat <128 as Open.
+      (function(){
+        const gN = s.gripper_position_norm;
+        const gR = s.gripper_position;
+        let isOpen = false;
+        if (typeof gN === 'number')      isOpen = gN < 0.5;
+        else if (typeof gR === 'number') isOpen = gR < 128;
+        document.getElementById('tcp-g').textContent = isOpen ? 'Open' : 'Closed';
+      })();
+    }
+  }catch(e){}
+}
+
+// ---- Teleop: keyboard + gamepad (per-family profiles) ----
+// Each robot family has its own profile so the keyboard map, gamepad
+// button layout, linear/angular gains, and per-axis sign flips can be
+// tuned independently. The active profile is selected by
+// applyRobotFamily() and lives in TP. To tweak bindings for one robot
+// without touching the others, edit only that family's entry below.
+function _defaultKeys(linVel, angVel, downVel){
+  // Standard IJKL/UO linear + WASD/QE rotational layout. Re-use this
+  // in a profile via `keys: _defaultKeys(profile.linVel, profile.angVel)`
+  // or replace the field with a hand-rolled map for fully custom bindings.
+  // `downVel` (m/s, optional) separately tunes the descent gain on `o`.
+  // Lets operators ease the gripper down onto a target without
+  // overshoot. Falls back to linVel.
+  const dn = (downVel === undefined) ? linVel : downVel;
+  return {
+    i:[ linVel,0,0,0,0,0],   // fwd  (+X)
+    k:[-linVel,0,0,0,0,0],   // back (-X)
+    j:[0, linVel,0,0,0,0],   // left (+Y)
+    l:[0,-linVel,0,0,0,0],   // right(-Y)
+    u:[0,0, linVel,0,0,0],   // up   (+Z)
+    o:[0,0,    -dn,0,0,0],   // down (-Z, separately tunable via downVel)
+    w:[0,0,0, angVel,0,0],   // pitch up   (+Rx)
+    s:[0,0,0,-angVel,0,0],   // pitch down (-Rx)
+    a:[0,0,0,0, angVel,0],   // roll left  (+Ry)
+    d:[0,0,0,0,-angVel,0],   // roll right (-Ry)
+    q:[0,0,0,0,0, angVel],   // yaw left   (+Rz)
+    e:[0,0,0,0,0,-angVel],   // yaw right  (-Rz)
+  };
+}
+
+const TELEOP_PROFILES={
+  // ---- UR10e (original mapping; do not change unless you mean to). ----
+  ur10e:{
+    linVel: 0.10,            // m/s   commanded linear velocity per fully-deflected stick or key
+    angVel: 0.50,            // rad/s commanded angular velocity per fully-deflected stick or key
+    deadzone: 0.15,          // gamepad stick deadzone (0..1)
+    axisSigns: [1,1,1,1,1,1],// per-component sign multiplier on the final 6-vector [vx,vy,vz,wrx,wry,wrz]
+    get keys(){ return _defaultKeys(this.linVel, this.angVel); },
+    gamepad:{
+      leftStickX: 0,         // axis index for left stick X (drives vel[1], "left/right")
+      leftStickY: 1,         // axis index for left stick Y (drives vel[0], "fwd/back")
+      rightStickX: 2,        // axis index for right stick X (drives vel[5], "yaw")
+      rightStickY: 3,        // axis index for right stick Y (drives vel[3], "pitch")
+      invertLeftY: true,     // most pads report stick-up as negative; true keeps "up = forward"
+      invertLeftX: true,     // true keeps "stick-left = +Y"
+      invertRightX: true,    // true keeps "stick-left = +yaw"
+      invertRightY: true,    // true keeps "stick-up = +pitch"
+      dpadUp: 12, dpadDown: 13, // Z+ / Z-
+      bumperL: 4, bumperR: 5,   // roll+ / roll-
+      triggerClose: 6, triggerOpen: 7, // gripper close / open (rising edge)
+      homeBtn: 8,            // home pose
+      recoverBtn: 9,         // clear reflex / protective stop without moving
+    },
+  },
+
+  // ---- Franka FR3. ----
+  // Start from the UR10e mapping; edit anything in this entry independently
+  // (linVel, angVel, deadzone, key layout, button indices, sign flips, etc).
+  // axisSigns is per-component on the OUTPUT 6-vector in the base frame, so
+  // a quick way to flip "forward" on a Franka whose base points the other
+  // way than your UR10e cell is to set axisSigns[0] = -1.
+  franka:{
+    // Slightly lower linVel for smoother feel, and a
+    // dedicated downVel so descent onto a grasp target is gentle (avoids
+    // overshooting through the handle before the operator releases the
+    // key). Edit any field here without touching the other families.
+    linVel: 0.07,             // m/s (was 0.10)
+    angVel: 0.45,             // rad/s
+    downVel: 0.03,            // m/s, descent (`o` key) only
+    deadzone: 0.15,
+    // Per-cell linear-axis sign flips. The robot in this
+    // cell is mounted such that operator's "forward stick" maps to
+    // robot's -X (toward operator), operator's "right stick" maps to
+    // robot's -Y, and D-pad-up maps to world -Z. axisSigns is applied
+    // to BOTH keyboard (teleopTick) AND gamepad (readGamepad), the
+    // architecturally-correct way to flip per-cell direction. Keeps
+    // invert flags consistent across all profiles (operator-frame
+    // conventions) and pushes cell-specific geometry into axisSigns.
+    axisSigns: [-1, -1, 1, 1, 1, 1],
+    get keys(){ return _defaultKeys(this.linVel, this.angVel, this.downVel); },
+    gamepad:{
+      leftStickX: 0,
+      leftStickY: 1,
+      rightStickX: 2,
+      rightStickY: 3,
+      invertLeftY: true,
+      // Reverted to true (consistent with other profiles). Per-cell
+      // flip handled by axisSigns above, not by per-axis invert.
+      invertLeftX: true,
+      invertRightX: true,
+      invertRightY: true,
+      dpadUp: 12, dpadDown: 13,
+      bumperL: 4, bumperR: 5,
+      triggerClose: 6, triggerOpen: 7,
+      homeBtn: 8,
+      recoverBtn: 9,
+    },
+  },
+
+  // ---- Unitree G1 (placeholder; mirrors ur10e until tuned). ----
+  g1:{
+    linVel: 0.10,
+    angVel: 0.50,
+    deadzone: 0.15,
+    axisSigns: [1,1,1,1,1,1],
+    get keys(){ return _defaultKeys(this.linVel, this.angVel); },
+    gamepad:{
+      leftStickX: 0,
+      leftStickY: 1,
+      rightStickX: 2,
+      rightStickY: 3,
+      invertLeftY: true,
+      invertLeftX: true,
+      invertRightX: true,
+      invertRightY: true,
+      dpadUp: 12, dpadDown: 13,
+      bumperL: 4, bumperR: 5,
+      triggerClose: 6, triggerOpen: 7,
+      homeBtn: 8,
+      recoverBtn: 9,
+    },
+  },
+  // ---- Bimanual Franka. Per-arm sub-profiles; the bimanual gamepad
+  // splits sticks (L = left arm, R = right arm) and uses the keyboard
+  // for fine left-only nudges. The bimanual frontend does NOT use the
+  // single-arm `keys` map, it routes via armJog() instead.
+  bimanual_franka:{
+    linVel: 0.08,            // tighter caps, cell is crowded
+    angVel: 0.40,
+    deadzone: 0.18,
+    axisSigns: [1,1,1,1,1,1],
+    // The legacy `keys` map drives single-arm jog buttons in the
+    // ".only-singlearm" block; for bimanual that block is hidden so
+    // this just satisfies the contract.
+    get keys(){ return _defaultKeys(this.linVel, this.angVel); },
+    gamepad:{
+      // Sticks: left stick -> left arm XY, right stick -> right arm XY.
+      // Triggers used for per-arm grippers; D-pad for Z on left,
+      // numpad-style buttons for Z on right.
+      leftStickX: 0, leftStickY: 1,
+      rightStickX: 2, rightStickY: 3,
+      invertLeftY: true, invertLeftX: true,
+      invertRightX: true, invertRightY: true,
+      dpadUp: 12, dpadDown: 13,
+      bumperL: 4, bumperR: 5,
+      triggerClose: 6, triggerOpen: 7,
+      homeBtn: 8,
+      recoverBtn: 9,
+    },
+  },
+};
+
+// Active profile. Updated by applyRobotFamily(). Default to UR10e so the
+// page works during the brief window before /api/status reports a family.
+let TP = TELEOP_PROFILES.ur10e;
+function _setActiveTeleop(fam){
+  const p = TELEOP_PROFILES[fam];
+  if(p) TP = p;
+}
+
+let teleopActive=false;
+let teleopLocked=false;  // sticky-mode flag; set true on click, false on STOP
+let heldKeys=new Set();
+let teleopInterval=null;
+let gripperOpen=true;
+let gamepadConnected=false;
+let gamepadIdx=null;
+let gamepadMapping='';     // 'standard' when the browser gives the canonical
+                           // W3C layout the profile indices assume; '' (raw
+                           // HID) otherwise — raw ordering varies by USB port,
+                           // which is why buttons move (Home -> speed etc).
+let gamepadLogInput=false; // when true, log every pressed button / moved axis
+                           // index so a non-standard pad can be re-mapped.
+let _gpPrevButtons=[];
+
+function setupTeleop(){
+  const zone=document.getElementById('teleop-zone');
+  zone.addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    if(k==='escape'){doStop();return}
+    if(k==='h'){doHome();return}
+    if(k==='g'){
+      gripperOpen=!gripperOpen;
+      grip(gripperOpen?'open':'close');
+      return;
+    }
+    if(TP.keys[k]&&!heldKeys.has(k)){
+      heldKeys.add(k);
+      updateKeyIndicators();
+    }
+    e.preventDefault();
+  });
+  zone.addEventListener('keyup',e=>{
+    const k=e.key.toLowerCase();
+    heldKeys.delete(k);
+    updateKeyIndicators();
+  });
+  zone.addEventListener('focus',()=>{
+    // Clicking the zone arms teleop and LOCKS it sticky, survives blur
+    // (e.g., clicking "Add Anchor" elsewhere on the page) so the user
+    // can drive between anchor points without re-clicking each time.
+    // STOP / ESC clears teleopLocked.
+    teleopActive=true;
+    teleopLocked=true;
+    document.getElementById('teleop-status').innerHTML='<span class="live-dot"></span>Teleop LOCKED: STOP/Esc to release';
+    /* focus color handled via accent */
+    
+    if(!teleopInterval){
+      teleopInterval=setInterval(teleopTick,33); // 50 Hz, smoother than the old 30 Hz
+    }
+  });
+  zone.addEventListener('blur',()=>{
+    if(teleopLocked){
+      // Sticky: keep teleop interval + gamepad polling alive. Drop any
+      // held keys (since keydown/keyup won't fire without focus) and
+      // hint to the user that re-focusing restores keyboard.
+      heldKeys.clear();
+      updateKeyIndicators();
+      sendStopVelocity();
+      document.getElementById('teleop-status').innerHTML='<span class="live-dot"></span>Teleop LOCKED (gamepad live, click to regain keys): STOP to release';
+      return;
+    }
+    teleopActive=false;
+    heldKeys.clear();
+    updateKeyIndicators();
+    document.getElementById('teleop-status').textContent='Click to enable teleop';
+    
+    
+    if(teleopInterval){clearInterval(teleopInterval);teleopInterval=null}
+    sendStopVelocity();
+  });
+
+  // Gamepad events
+  window.addEventListener('gamepadconnected',e=>{
+    gamepadConnected=true; gamepadIdx=e.gamepad.index;
+    gamepadMapping=e.gamepad.mapping||'';
+    const name=e.gamepad.id;
+    const std=gamepadMapping==='standard';
+    // The profile button/axis indices are the W3C "standard" layout. When the
+    // browser reports a non-standard mapping the raw HID order applies instead
+    // and differs by USB port, so the indices land on the wrong controls.
+    const stat=document.getElementById('gamepad-status');
+    stat.textContent='Gamepad: '+name+'  ['+(std?'standard ✓':'NON-STANDARD ⚠')+
+      '  '+e.gamepad.buttons.length+'btn/'+e.gamepad.axes.length+'ax]';
+    stat.style.color=std?'var(--tx-3)':'var(--amber)';
+    log('Gamepad: '+name+' | mapping='+(gamepadMapping||'(raw)')+
+        ' | '+e.gamepad.buttons.length+' buttons, '+e.gamepad.axes.length+' axes', std?'ok':'err');
+    if(!std) log('⚠ Non-standard mapping: button indices are unreliable and '+
+                 'change by USB port. Try another port for "standard", or turn on '+
+                 '"log gamepad input" and press each button to re-map.','err');
+  });
+  window.addEventListener('gamepaddisconnected',()=>{
+    gamepadConnected=false; gamepadIdx=null;
+    document.getElementById('gamepad-status').textContent='';
+    log('Gamepad disconnected','inf');
+  });
+}
+
+function updateKeyIndicators(){
+  document.querySelectorAll('.key-ind').forEach(el=>{
+    el.classList.toggle('pressed',heldKeys.has(el.dataset.k));
+  });
+}
+
+function readGamepad(){
+  // Returns [vx,vy,vz,wrx,wry,wrz] from gamepad, or null. All bindings
+  // (linear/angular gains, deadzone, stick axes, button indices, sign
+  // flips) come from the active per-family profile TP, see TELEOP_PROFILES.
+  if(!gamepadConnected||gamepadIdx===null) return null;
+  const gp=navigator.getGamepads()[gamepadIdx];
+  if(!gp) return null;
+  // Re-map helper: with logging on, report the raw index of any button that
+  // was just pressed (and any strongly-deflected axis) so a non-standard pad
+  // can be mapped to the profile. Press Home, read "button N pressed".
+  if(gamepadLogInput){
+    gp.buttons.forEach((b,i)=>{
+      const was=_gpPrevButtons[i];
+      if(b.pressed && !was) log('gamepad button '+i+' pressed','acc');
+    });
+    gp.axes.forEach((v,i)=>{ if(Math.abs(v)>0.7) log('gamepad axis '+i+' = '+v.toFixed(2),'acc'); });
+  }
+  _gpPrevButtons=gp.buttons.map(b=>b.pressed);
+  const g = TP.gamepad;
+  const LIN = TP.linVel, ANG = TP.angVel;
+  const vel=[0,0,0,0,0,0];
+  const dz=TP.deadzone;
+  const ax=i=>{const v=gp.axes[i]||0; return Math.abs(v)<dz?0:v};
+  const sx = s => s ? -1 : 1;  // invert flag -> sign multiplier
+
+  // Left stick -> XY linear
+  vel[0]=sx(g.invertLeftY)*ax(g.leftStickY)*LIN; // forward/back
+  vel[1]=sx(g.invertLeftX)*ax(g.leftStickX)*LIN; // left/right
+
+  // Right stick -> rotation
+  vel[5]=sx(g.invertRightX)*ax(g.rightStickX)*ANG; // yaw
+  vel[3]=sx(g.invertRightY)*ax(g.rightStickY)*ANG; // pitch
+
+  // D-pad -> Z. Many gamepads (Logitech F710 X-input, some PS controllers
+  // in DirectInput mode) emit D-pad as buttons[12..15]; others (PS5
+  // DualSense, some Xbox driver versions) emit as axes[6]/axes[7]. Check
+  // BOTH so the D-pad works regardless of which mapping the browser
+  // exposes.
+  let dpadVz = 0;
+  const _bUp   = gp.buttons[g.dpadUp];
+  const _bDown = gp.buttons[g.dpadDown];
+  if(_bUp?.pressed)   dpadVz =  LIN;
+  if(_bDown?.pressed) dpadVz = -LIN;
+  // Axes fallback. Standard mappings put D-pad Y on axes[7] (Xbox X-input,
+  // most modern controllers) or axes[5] (DirectInput Logitech, some older
+  // pads). Same convention either way: -1 = up, +1 = down. Check both
+  // so the same code works across controllers without per-pad profiles.
+  const dpadAxX = gp.axes[6] !== undefined ? gp.axes[6] : 0;
+  const dpadAxY7 = gp.axes[7] !== undefined ? gp.axes[7] : 0;
+  const dpadAxY5 = gp.axes[5] !== undefined ? gp.axes[5] : 0;
+  // Pick the larger-magnitude axis (the one the pad is actually driving).
+  const dpadAxY = Math.abs(dpadAxY7) >= Math.abs(dpadAxY5) ? dpadAxY7 : dpadAxY5;
+  if(dpadVz === 0 && Math.abs(dpadAxY) > 0.5){
+    dpadVz = dpadAxY < 0 ? LIN : -LIN;  // axis up = -1 -> +Z
+  }
+  if(dpadVz !== 0) vel[2] = dpadVz;
+
+  // Bumpers -> roll
+  if(gp.buttons[g.bumperL]?.pressed) vel[4]= ANG;
+  if(gp.buttons[g.bumperR]?.pressed) vel[4]=-ANG;
+
+  // Gripper: simple binary edge-detected close/open (mirrors the
+  // UR10e cell mapping which has been reliable for months).
+  // Button indices come from the per-family profile (g.triggerClose /
+  // g.triggerOpen, usually 6 and 7 on standard Xbox layouts).
+  // Rising-edge detection only, no analog streaming, no internal
+  // state to drift out of sync.  Each press fires one /api/gripper
+  // close or open with the default driver force (60 N on Franka).
+  const _closePressed = !!gp.buttons[g.triggerClose]?.pressed;
+  const _openPressed  = !!gp.buttons[g.triggerOpen]?.pressed;
+  if (_closePressed && !readGamepad._closePrev) grip('close');
+  if (_openPressed  && !readGamepad._openPrev)  grip('open');
+  readGamepad._closePrev = _closePressed;
+  readGamepad._openPrev  = _openPressed;
+
+  // Home button (rising edge so a 30 Hz teleop tick doesn't spam /api/home
+  // for as long as the button is held).
+  const homeNow = !!gp.buttons[g.homeBtn]?.pressed;
+  if(homeNow && !readGamepad._homePrev) doHome();
+  readGamepad._homePrev = homeNow;
+
+  // Recover button (rising edge). Distinct from home: clears reflex /
+  // protective-stop without moving the arm. Use after singularity or
+  // joint-limit lockup so teleop resumes from the current pose.
+  if(g.recoverBtn!==undefined){
+    const recNow = !!gp.buttons[g.recoverBtn]?.pressed;
+    if(recNow && !readGamepad._recoverPrev) doRecover();
+    readGamepad._recoverPrev = recNow;
+  }
+
+  // Per-family final sign flip on the 6-vector (e.g. flip "forward" axis).
+  const s = TP.axisSigns || [1,1,1,1,1,1];
+  for(let i=0;i<6;i++) vel[i]*=s[i];
+
+  return vel;
+}
+
+function teleopTick(){
+  // Combine keyboard + gamepad into one velocity
+  const vel=[0,0,0,0,0,0];
+
+  // Keyboard (per-family profile keys, with final axis-sign flip applied)
+  const keyMap = TP.keys;
+  const signs = TP.axisSigns || [1,1,1,1,1,1];
+  for(const k of heldKeys){
+    const v=keyMap[k];
+    if(v) for(let i=0;i<6;i++) vel[i]+=v[i]*signs[i];
+  }
+
+  // Gamepad (readGamepad already applies the profile and axis signs)
+  const gpVel=readGamepad();
+  if(gpVel) for(let i=0;i<6;i++) vel[i]+=gpVel[i];
+
+  // Velocity dispatch policy:
+  //   POST every tick WHILE moving (so EMA tracks input + franky's
+  //   CartesianVelocityMotion keeps re-planning to the live target).
+  //   POST ONCE on the moving->stopped transition (sends an explicit
+  //   zero so the EMA decays + franky halts).
+  //   Do NOT post when idle. Earlier we tried "always POST while
+  //   teleopActive" to fix a "won't stop" bug, but that hammered
+  //   franky with thousands of zero-velocity commands per session,
+  //   eventually corrupting its internal state and triggering a
+  //   C++ `terminate called without an active exception` crash that
+  //   takes the whole server down.
+  const moving = vel.some(v=>Math.abs(v) > 1e-4);
+  if(moving){
+    api('POST','/api/velocity',{vx:vel[0],vy:vel[1],vz:vel[2],wrx:vel[3],wry:vel[4],wrz:vel[5],duration:0.05}).catch(()=>{});
+    window._teleopWasMoving = true;
+  } else if(window._teleopWasMoving){
+    // Falling-edge: send one explicit zero so franky receives a
+    // halt command (the duration=0.05 of the previous motion would
+    // have stopped naturally too, but this is belt-and-suspenders).
+    api('POST','/api/velocity',{vx:0,vy:0,vz:0,wrx:0,wry:0,wrz:0,duration:0.05}).catch(()=>{});
+    window._teleopWasMoving = false;
+  }
+}
+
+async function sendStopVelocity(){
+  try{await api('POST','/api/velocity',{vx:0,vy:0,vz:0,wrx:0,wry:0,wrz:0,duration:0.01})}catch(e){}
+}
+
+// Click-based jog (for remote desktop / touch)
+let _jogIntervals={};
+function jogStart(k){
+  if(_jogIntervals[k]) return;
+  if(!teleopActive){
+    teleopActive=true;
+    document.getElementById('teleop-status').innerHTML='<span class="live-dot"></span>Teleop active';
+    if(!teleopInterval) teleopInterval=setInterval(teleopTick,33);
+  }
+  heldKeys.add(k);
+  updateKeyIndicators();
+  // Also send immediately
+  teleopTick();
+}
+function jogStop(k){
+  heldKeys.delete(k);
+  updateKeyIndicators();
+  if(heldKeys.size===0) sendStopVelocity();
+}
+
+// ---- Tags ----
+function addTag(){
+  const inp=document.getElementById('in-prompt');
+  const v=inp.value.trim();
+  if(!v||tags.includes(v)) return;
+  tags.push(v);renderTags();inp.value='';inp.focus();
+}
+function rmTag(i){tags.splice(i,1);renderTags()}
+function renderTags(){
+  document.getElementById('tag-list').innerHTML=tags.map((t,i)=>
+    `<span class="tag">${esc(t)}<span class="x" onclick="rmTag(${i})">&times;</span></span>`
+  ).join('');
+}
+function autoPrompts(){
+  tags=autoExtract();renderTags();
+  if(tags.length) log('Auto-extracted: '+tags.join(', '),'inf');
+}
+function autoExtract(){
+  const txt=document.getElementById('in-instr').value;
+  if(!txt) return [];
+  const stop=new Set('pick up the and place it on put in into a an to from move grab take get set drop both all each'.split(' '));
+  const words=txt.toLowerCase().replace(/,/g,' ').split(/\s+/);
+  const out=[];let cur=[];
+  for(const w of words){if(stop.has(w)){if(cur.length){out.push(cur.join(' '));cur=[]}}else cur.push(w)}
+  if(cur.length) out.push(cur.join(' '));
+  return out;
+}
+
+// ---- Steps ----
+function setStep(id){
+  const order=['cap','det','plan','exec'];
+  const idx=order.indexOf(id);
+  order.forEach((s,i)=>{
+    const el=document.getElementById('s-'+s);
+    el.className='step'+(i<idx?' ok':i===idx?' act':'');
+  });
+}
+
+// ---- Log ----
+// ts (optional): seconds since the epoch, from the server, marking when the
+// event ACTUALLY happened. Without it every line is stamped at render time,
+// which is why a batch of progress entries used to render with one identical
+// timestamp -- the clock being read was the browser's, at paint, not the
+// robot's, at the step. Callers with a real event time should pass it.
+function log(msg,cls='',ts=null){
+  const el=document.getElementById('log');
+  const t=new Date(ts!=null?ts*1000:Date.now()).toLocaleTimeString('en',{hour12:false});
+  const e=document.createElement('div');e.className='log-e fade';
+  e.innerHTML=`<span class="log-t">${t}</span><span class="log-m ${cls}">${esc(msg)}</span>`;
+  el.appendChild(e);el.scrollTop=el.scrollHeight;
+  while(el.children.length>300) el.removeChild(el.firstChild);
+}
+function clearLog(){document.getElementById('log').innerHTML='';log('Cleared','inf')}
+
+// ---- History ----
+function addHist(d){
+  const list=document.getElementById('hist-list');
+  const em=list.querySelector('.empty-msg');if(em) em.remove();
+  const el=document.createElement('div');el.className='hist fade';
+  el.innerHTML=`<span class="hist-dot ${d.success?'ok':'fail'}"></span>`
+    +`<div class="hist-body"><div class="hist-instr">${esc(d.instruction)}</div>`
+    +`<div class="hist-meta">${(d.duration||0).toFixed(1)}s | ${(d.detections||[]).length} obj</div></div>`;
+  list.prepend(el);
+}
+
+// ---- Episode bundle review ----
+// Renders a banner above the live log with Save / Discard buttons
+// for the cache from the most recent episode. Save renames the
+// cache folder to episodes_kept/<task>_<id>/; Discard wipes it.
+// Starting a new task auto-discards (the server clears the cache
+// at the top of execute_approved).
+function showEpisodePanel(instruction,ep,success){
+  let bar=document.getElementById('episode-bar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='episode-bar';
+    bar.style.cssText='margin:8px 0;padding:10px 12px;border-radius:8px;'
+      +'background:var(--bg-2,#1a1d23);border:1px solid var(--border,#2a2f3a);'
+      +'display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;';
+    const host=document.getElementById('sec-plan')||document.body;
+    host.parentNode.insertBefore(bar,host);
+  }
+  const dot=success?'ok':'fail';
+  bar.innerHTML=`<span class="hist-dot ${dot}"></span>`
+    +`<div style="flex:1;min-width:200px;">`
+    +`  <div><b>Episode cached:</b> ${esc(instruction||ep.instruction||'')}</div>`
+    +`  <div style="opacity:.7;">${ep.n_samples||0} traj samples, ${ep.episode_id||''}</div>`
+    +`</div>`
+    +`<input id="ep-name" placeholder="task name (optional)" style="flex:1;min-width:120px;padding:4px 8px;">`
+    +`<button class="btn btn-s" onclick="saveEpisode('pass')" style="background:var(--grn-15);border-color:var(--grn);color:var(--grn)">PASS</button>`
+    +`<button class="btn btn-s" onclick="markFail()" style="background:var(--red-15);border-color:var(--red);color:var(--red)">FAIL</button>`
+    +`<button class="btn btn-s" onclick="discardEpisode()" title="Throw the episode away entirely - prefer FAIL, failures are training data">Discard</button>`;
+  const nm=document.getElementById('ep-name');
+  if(nm) nm.value=instruction||'';
+}
+// PASS = the operator's verdict, which is the only trustworthy one right now:
+// task-success predicates are not reliable enough to label a corpus with.
+// Stops the run first, then records the episode as a success.
+async function doPass(){
+  log('PASS - stopping and recording as SUCCESS','ok');
+  await doStop({silent:true});
+  await saveEpisode('pass');
+}
+// A FAILED run is DATA, not rubbish: it is the negative half a verifier study
+// needs and the expensive half to collect on purpose. Keep it, labelled.
+async function markFail(){ await saveEpisode('fail'); }
+async function saveEpisode(outcome){
+  const nm=(document.getElementById('ep-name')||{}).value||'';
+  try{
+    const r=await api('POST','/api/episode/save',{task_name:nm,outcome:outcome||null});
+    const tag=outcome?(' ['+outcome.toUpperCase()+']'):'';
+    if(r.episode&&r.episode.kept_path){
+      toast('Saved'+tag+': '+r.episode.kept_path, outcome==='fail'?'':'ok', 4000);
+    }else{
+      toast('Saved'+tag, outcome==='fail'?'':'ok', 4000);
+    }
+    const bar=document.getElementById('episode-bar');if(bar)bar.remove();
+  }catch(e){toast('Save failed: '+e.message,'err',5000)}
+}
+async function discardEpisode(){
+  try{
+    await api('POST','/api/episode/discard',{});
+    toast('Episode discarded','',3000);
+    const bar=document.getElementById('episode-bar');if(bar)bar.remove();
+  }catch(e){toast('Discard failed: '+e.message,'err',4000)}
+}
+
+// ---- BT library view ----
+// Lists every saved BT with success counters and a Promote toggle.
+// Promoted entries are always injected into the planner's few-shot
+// context (regardless of jaccard similarity) so they act as
+// canonical recipes the LLM can rely on.
+async function showLibrary(){
+  let panel=document.getElementById('lib-panel');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='lib-panel';
+    panel.style.cssText='position:fixed;right:12px;bottom:12px;width:380px;max-height:60vh;'
+      +'overflow:auto;background:var(--bg-1,#11131a);border:1px solid var(--border,#2a2f3a);'
+      +'border-radius:8px;padding:10px;z-index:9999;font-size:12px;';
+    document.body.appendChild(panel);
+  }
+  panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<b>BT Library</b>'
+    +'<button class="btn btn-s" onclick="document.getElementById(\'lib-panel\').remove()">close</button>'
+    +'</div><div id="lib-list">loading...</div>';
+  try{
+    const r=await api('GET','/api/library/list');
+    const list=document.getElementById('lib-list');
+    if(!r.entries||!r.entries.length){list.textContent='(empty, no saved BTs yet)';return}
+    list.innerHTML='';
+    r.entries.forEach(e=>{
+      const row=document.createElement('div');
+      row.style.cssText='padding:6px 0;border-top:1px solid var(--border,#222);';
+      const star=e.promoted?'★ ':'';
+      row.innerHTML=`<div><b>${star}${esc(e.instruction)}</b></div>`
+        +`<div style="opacity:.7;">${e.success}ok ${e.fail}x, ${(e.objects||[]).join(', ')}</div>`
+        +`<button class="btn btn-s" onclick="togglePromote('${e.hash}',${!e.promoted})">`
+        +`${e.promoted?'Demote':'Promote'}</button>`;
+      list.appendChild(row);
+    });
+  }catch(e){
+    document.getElementById('lib-list').textContent='error: '+e.message;
+  }
+}
+async function togglePromote(h,promoted){
+  try{
+    await api('POST','/api/library/promote',{hash:h,promoted});
+    showLibrary();
+  }catch(e){toast('Promote failed: '+e.message,'err',4000)}
+}
+
+// ---- Helpers ----
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function toast(msg,cls='',ms=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+cls+' show';
+  if(t._toastTimer) clearTimeout(t._toastTimer);
+  t._toastTimer=setTimeout(()=>t.className='toast',ms);
+}
+
+// ---- Trial recorder ----
+// Captures the live <img> feed into a hidden canvas at ~30 fps, pipes
+// canvas.captureStream() into MediaRecorder, downloads a .webm on stop.
+// Records whichever camera the viewer is currently showing (single, depth,
+// or 'all' tile), whatever is in #cam-img.
+let _rec={active:false,recorder:null,chunks:[],canvas:null,ctx:null,timer:null,stream:null,startedAt:0};
+
+function toggleRecord(){ if(_rec.active) stopRecord(); else startRecord(); }
+
+async function startRecord(){
+  const img=document.getElementById('cam-img');
+  if(!img||!img.naturalWidth){
+    toast('Start a camera feed first','err');return;
+  }
+  if(typeof MediaRecorder==='undefined'){
+    toast('MediaRecorder not supported in this browser','err');return;
+  }
+  const canvas=document.createElement('canvas');
+  canvas.width=img.naturalWidth;
+  canvas.height=img.naturalHeight;
+  const ctx=canvas.getContext('2d');
+  // Draw at ~30fps. Live feed updates slower (~12 fps); duplicates compress
+  // to near-zero in webm so this is cheap.
+  const timer=setInterval(()=>{
+    if(!_rec.active) return;
+    if(img.naturalWidth) ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  },1000/30);
+  // Prime first frame
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+  const stream=canvas.captureStream(30);
+  let mime='video/webm;codecs=vp9';
+  if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm;codecs=vp8';
+  if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm';
+  let recorder;
+  try{
+    recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4_000_000});
+  }catch(e){
+    clearInterval(timer);
+    toast('Recorder init failed: '+e.message,'err');return;
+  }
+  const chunks=[];
+  recorder.ondataavailable=e=>{ if(e.data&&e.data.size>0) chunks.push(e.data); };
+  recorder.onstop=()=>{
+    const blob=new Blob(chunks,{type:mime});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    const dur=((Date.now()-_rec.startedAt)/1000).toFixed(1);
+    a.href=url; a.download=`spark-trial-${ts}.webm`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    log(`Recording saved: ${a.download} (${dur}s, ${(blob.size/1e6).toFixed(1)}MB)`,'ok');
+    toast('Recording saved','ok',6000);
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+  };
+  recorder.start(1000); // chunk every 1s for memory safety on long trials
+  _rec={active:true,recorder,chunks,canvas,ctx,timer,stream,startedAt:Date.now()};
+  const btn=document.getElementById('btn-record');
+  btn.classList.add('recording');
+  btn.innerHTML='<span class="rec-dot"></span>Stop';
+  log('Recording started','inf');
+  toast('Recording...','inf');
+}
+
+function stopRecord(){
+  if(!_rec.active) return;
+  _rec.active=false;
+  if(_rec.timer) clearInterval(_rec.timer);
+  if(_rec.recorder&&_rec.recorder.state!=='inactive'){
+    try{ _rec.recorder.stop(); }catch(e){}
+  }
+  const btn=document.getElementById('btn-record');
+  btn.classList.remove('recording');
+  btn.innerHTML='<span class="rec-dot"></span>Record';
+}
+function hlYaml(y){
+  return (y||'')
+    .replace(/^(\s*)([\w_]+):/gm,'$1<span class="k">$2</span>:')
+    .replace(/:\s+"([^"]+)"/g,': <span class="s">"$1"</span>')
+    .replace(/:\s+'([^']+)'/g,": <span class=\"s\">'$1'</span>")
+    .replace(/:\s+(\d+\.?\d*)/g,': <span class="v">$1</span>');
+}
+
+// ---- Global keys (teleop works globally, not just in zone) ----
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+
+  // Teleop keys work globally (no need to focus zone)
+  const k=e.key.toLowerCase();
+  if(k==='escape'){doStop();e.preventDefault();return}
+  if(k==='h'){doHome();e.preventDefault();return}
+  if(k==='g'){
+    gripperOpen=!gripperOpen;
+    grip(gripperOpen?'open':'close');
+    e.preventDefault();return;
+  }
+  if(TP.keys[k]){
+    if(!teleopActive){
+      teleopActive=true;
+      document.getElementById('teleop-status').innerHTML='<span class="live-dot"></span>Teleop active';
+      if(!teleopInterval) teleopInterval=setInterval(teleopTick,33);
+    }
+    if(!heldKeys.has(k)){
+      heldKeys.add(k);
+      updateKeyIndicators();
+    }
+    e.preventDefault();return;
+  }
+
+  if(e.target.id==='teleop-zone') return;
+  if(e.key==='1')openTab('task');if(e.key==='2')openTab('robot');
+  if(e.key==='3')openTab('log');if(e.key==='4')openTab('hist');
+  if(e.key==='c'&&!e.ctrlKey)doCapture();
+  if(e.key==='d')doDetect();
+  if(e.key==='Escape')doStop();
+});
+document.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(heldKeys.has(k)){
+    heldKeys.delete(k);
+    updateKeyIndicators();
+    // If no keys held, stop after brief delay
+    if(heldKeys.size===0 && teleopActive){
+      sendStopVelocity();
+    }
+  }
+});
+
+// ---- Live camera feed (polling /api/capture/fast) ----
+let liveFeedRunning=false;
+let liveFps=0;
+let liveFrameCount=0;
+let liveFpsTimer=null;
+let _depthMode=false;
+let _irMode=false;
+
+async function _applyStreamMode(){
+  // depth and ir are mutually exclusive with rgb. depth takes precedence
+  // if both flags somehow get set (shouldn't happen via the buttons).
+  const mode = _depthMode ? 'depth' : (_irMode ? 'ir' : 'rgb');
+  const btnD=document.getElementById('btn-depth');
+  const btnI=document.getElementById('btn-ir');
+  btnD.style.background=_depthMode?'var(--cyan)':'';
+  btnD.style.color=_depthMode?'#000':'';
+  btnI.style.background=_irMode?'var(--cyan)':'';
+  btnI.style.color=_irMode?'#000':'';
+  await api('POST','/api/stream_mode',{mode});
+  const tag = mode === 'depth' ? 'DEPTH (turbo)'
+            : mode === 'ir'    ? 'IR (active)'
+            : 'LIVE';
+  document.getElementById('cam-tag').textContent=tag;
+  // If a detection overlay is pinned, the static annotated image is
+  // currently showing. Switch back to live feed (in the newly-selected
+  // mode) so the persistent bbox overlay renders on top of the live
+  // stream the operator just asked for.
+  if(_persistentOverlay && _showingDetection){
+    _showingDetection=false;
+    if(!liveFeedRunning) startLiveFeed();
+  }
+}
+
+async function toggleDepth(){
+  _depthMode=!_depthMode;
+  if(_depthMode) _irMode=false;
+  await _applyStreamMode();
+}
+
+async function toggleIR(){
+  _irMode=!_irMode;
+  if(_irMode) _depthMode=false;
+  await _applyStreamMode();
+}
+
+
+let _streamCam='all';
+let _zoomLevel=1, _panX=0, _panY=0, _isPanning=false, _panStart={x:0,y:0};
+async function switchStreamCam(cam){
+  _streamCam=cam;
+  await api('POST','/api/stream_camera',{camera:cam});
+  const tag=document.getElementById('cam-tag');
+  tag.textContent=cam==='all'?'LIVE':cam.toUpperCase();
+  // Reset zoom when switching
+  _zoomLevel=1; _panX=0; _panY=0;
+  _applyZoom();
+}
+
+function _applyZoom(){
+  const img=document.getElementById('cam-img');
+  if(_streamCam==='all' || _zoomLevel<=1){
+    img.style.transform='';
+    img.style.transformOrigin='';
+    img.style.cursor='';
+    _zoomLevel=1; _panX=0; _panY=0;
+  } else {
+    img.style.transform=`scale(${_zoomLevel}) translate(${_panX}px, ${_panY}px)`;
+    img.style.transformOrigin='center center';
+    img.style.cursor='grab';
+  }
+}
+
+function _setupZoom(){
+  const vp=document.getElementById('viewport');
+  vp.addEventListener('wheel',e=>{
+    if(_streamCam==='all') return;
+    e.preventDefault();
+    const delta=e.deltaY>0?-0.2:0.2;
+    _zoomLevel=Math.max(1, Math.min(8, _zoomLevel+delta));
+    if(_zoomLevel<=1){_panX=0;_panY=0;}
+    _applyZoom();
+  },{passive:false});
+
+  vp.addEventListener('mousedown',e=>{
+    if(_streamCam==='all'||_zoomLevel<=1) return;
+    if(e.button!==1 && !e.shiftKey) return; // middle-click or shift+click to pan
+    _isPanning=true;
+    _panStart={x:e.clientX-_panX, y:e.clientY-_panY};
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!_isPanning) return;
+    _panX=e.clientX-_panStart.x;
+    _panY=e.clientY-_panStart.y;
+    _applyZoom();
+  });
+  window.addEventListener('mouseup',()=>{_isPanning=false;});
+}
+
+// Sticky pause: survives the many auto-restart call sites (post-detect,
+// post-execute, cam switch). While paused the server encodes zero frames
+// for this tab; prompts, teleop, and status keep working.
+let _feedPaused=false;
+function toggleFeed(){
+  _feedPaused=!_feedPaused;
+  const b=document.getElementById('btn-feed');
+  if(_feedPaused){stopLiveFeed();if(b)b.textContent='Feed: off';}
+  else{if(b)b.textContent='Feed: on';startLiveFeed();}
+}
+function startLiveFeed(){
+  if(liveFeedRunning||_feedPaused) return;
+  liveFeedRunning=true;
+  liveFpsTimer=setInterval(()=>{liveFps=liveFrameCount;liveFrameCount=0},1000);
+
+  async function tick(){
+    if(!liveFeedRunning || _showingDetection) return;
+    try{
+      const res=await fetch(API+'/api/capture/stream');
+      if(!res.ok) throw new Error(res.statusText);
+      // Check again after await, detection might have started during fetch
+      if(!liveFeedRunning || _showingDetection) return;
+      const blob=await res.blob();
+      const url=URL.createObjectURL(blob);
+      const img=document.getElementById('cam-img');
+      const old=img._blobUrl;
+      img.onload=()=>{
+        if(old) URL.revokeObjectURL(old);
+        // Detection bboxes survive mode/cam switches because they're
+        // redrawn on the canvas overlay every frame.
+        if(_persistentOverlay) redrawPersistentOverlay();
+      };
+      img._blobUrl=url;
+      img.src=url;
+      img.style.display='block';
+      document.getElementById('cam-empty').style.display='none';
+      document.getElementById('cam-tag').style.display='block';
+      document.getElementById('cam-tag').textContent=_depthMode?'DEPTH (turbo)':((_streamCam&&_streamCam!=='all')?_streamCam:'live').toUpperCase();
+      document.getElementById('cam-ts').style.display='block';
+      document.getElementById('cam-ts').textContent=liveFps+'fps';
+      liveFrameCount++;
+    }catch(e){}
+    if(liveFeedRunning && !_showingDetection) setTimeout(tick, 80);
+  }
+  tick();
+}
+
+function stopLiveFeed(){
+  liveFeedRunning=false;
+  if(liveFpsTimer){clearInterval(liveFpsTimer);liveFpsTimer=null}
+}
+
+// ---- Boot ----
+setupCanvas();
+setupTeleop();
+_setupZoom();
+// Poll cadence: 1.5s gives the activity pill (Idle/Detecting/Planning/Executing)
+// a responsive feel without hammering the server.
+setInterval(pollStatus,1500);
+setInterval(refreshTcp,1000);  // 1 Hz; bumping past this hammers the server
+pollStatus();
+// Fetch robot identity once on load and configure body class + banner.
+// Server CLI flag --robot (ur10e|franka|g1) drives this; if /api/robot
+// is unavailable (older server build) we silently keep the default UR10e
+// banner-less layout. The page is also openable with a ?robot=<family>
+// query string for offline / pre-pipeline preview, which seeds the theme
+// before either /api/robot or /api/status returns.
+function _robotFromQuery(){
+  try{
+    const q=new URLSearchParams(window.location.search).get('robot');
+    if(!q) return null;
+    const fam=q.toLowerCase();
+    return ROBOT_FAMILIES.includes(fam)?fam:null;
+  }catch(e){return null}
+}
+const _qsFam=_robotFromQuery();
+if(_qsFam) applyRobotFamily(_qsFam);
+async function applyRobotIdentity(){
+  try{
+    const r=await fetch('/api/robot');
+    if(!r.ok) return;
+    const info=await r.json();
+    const fam=(info.family||'ur10e').toLowerCase();
+    // Body class + chip label. The robot banner is intentionally not shown;
+    // the FR3 chip in the header already identifies the robot.
+    applyRobotFamily(fam);
+  }catch(e){/* leave default UI in place; pollStatus will retry via robot_family */}
+}
+applyRobotIdentity();
+// Auto-start live feed after 2s (give pipeline time to respond)
+setTimeout(startLiveFeed,2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+# Task 7 of the human-parity demo set:
+# "pick up the plushie and place in bowl".
+instruction: "pick up the plushie and place in bowl"
+aliases:
+  - "pick up the plushie and place in the bowl"
+  - "pick up the plushie and place it in the bowl"
+  - "put the plushie in the bowl"
+  - "place the plushie in the bowl"
+objects: ["plushie", "bowl"]
+priority: 10
+promote: true
+verified: true
+provenance: >-
+  Captured verbatim from live-run library entry 3ce5a3a83d2e
+  ("pick up the plushie and place in the bowl", success=1 fail=0).
+notes: >-
+  Low grasp force (20) and a wide target_width (0.03) because the plushie
+  is compliant -- the Robotiq's gObj feedback is unreliable on soft
+  objects, so the grasp is width-commanded rather than force-verified.
+  Release offset is 0.15 above the bowl centroid, high enough that the
+  plushie clears the rim on the way in.
+  If two plushies are staged, prompt "<color> plushie" instead: SAM3
+  separates them cleanly (0.86 vs 0.21 confidence) and the label resolver
+  will bind "plushie" to whichever is detected if only one is present.
+score:
+  task: "pick up the plushie and place in bowl"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "plushie", offset_z: 0.0}
+      - type: grasp
+        params: {force: 20, target_width: 0.03}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: move_to_keypoint
+        params: {keypoint_label: "bowl", offset_z: 0.15}
+      - type: release
+        params: {tilt_angle: 0.0}

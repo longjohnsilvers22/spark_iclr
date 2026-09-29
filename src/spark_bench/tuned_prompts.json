@@ -1,0 +1,1216 @@
+{
+  "per_task": {
+    "akita_black_bowl_1": [
+      {
+        "suite": "spatial",
+        "task_id": 0,
+        "phrase": "Round dark bowl",
+        "score": 0.2594652908002163,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.2594652908002163,
+            "Round dark bowl"
+          ],
+          [
+            0.2349102049767912,
+            "Black bowl"
+          ],
+          [
+            0.09041684629320453,
+            "Ceramic black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 1,
+        "phrase": "Black bowl",
+        "score": 0.3871708628085451,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.3871708628085451,
+            "Black bowl"
+          ],
+          [
+            0.32953528554108596,
+            "Round dish"
+          ],
+          [
+            0.14083471286831659,
+            "Dark container"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 2,
+        "phrase": "Small bowl",
+        "score": 0.6645868535634519,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.6645868535634519,
+            "Small bowl"
+          ],
+          [
+            0.5717495177601918,
+            "Round container"
+          ],
+          [
+            0.45615528158303675,
+            "Black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 3,
+        "phrase": "deep bowl",
+        "score": 0.3909823560756585,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.3909823560756585,
+            "deep bowl"
+          ],
+          [
+            0.3254029713887885,
+            "black bowl"
+          ],
+          [
+            0.2366998439546819,
+            "round dish"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 4,
+        "phrase": "Round container",
+        "score": 0.45351242617117143,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.45351242617117143,
+            "Round container"
+          ],
+          [
+            0.16046209813057985,
+            "Dark serving dish"
+          ],
+          [
+            0.1361067353720352,
+            "Black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 5,
+        "phrase": "Round container",
+        "score": 0.5580928989763114,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5580928989763114,
+            "Round container"
+          ],
+          [
+            0.46371614903695013,
+            "Deep bowl"
+          ],
+          [
+            0.4376516632154721,
+            "Black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 6,
+        "phrase": "Round container",
+        "score": 0.5592582523517933,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5592582523517933,
+            "Round container"
+          ],
+          [
+            0.2794850491186258,
+            "Black bowl"
+          ],
+          [
+            0.1566325818004546,
+            "Serving bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 7,
+        "phrase": "dark kitchen dish",
+        "score": 0.43608431162446165,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.43608431162446165,
+            "dark kitchen dish"
+          ],
+          [
+            0.41668134885822666,
+            "black bowl"
+          ],
+          [
+            0.3666400266440561,
+            "round black container"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 8,
+        "phrase": "Small black bowl",
+        "score": 0.421649573544104,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.421649573544104,
+            "Small black bowl"
+          ],
+          [
+            0.39095556378721036,
+            "Black bowl"
+          ],
+          [
+            0.22055359233126795,
+            "Round black container"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 9,
+        "phrase": "Dark serving bowl",
+        "score": 0.5353409579381777,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5353409579381777,
+            "Dark serving bowl"
+          ],
+          [
+            0.373901818633275,
+            "Black bowl"
+          ],
+          [
+            0.3011186981201548,
+            "Empty black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 1,
+        "phrase": "kitchen bowl",
+        "score": 0.5822526185700113,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5822526185700113,
+            "kitchen bowl"
+          ],
+          [
+            0.346773200155899,
+            "round container"
+          ],
+          [
+            0.166486076518552,
+            "black bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 3,
+        "phrase": "Food bowl",
+        "score": 0.6260691702506432,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.6260691702506432,
+            "Food bowl"
+          ],
+          [
+            0.3108666479161949,
+            "Dark bowl"
+          ],
+          [
+            0.25026749354043465,
+            "Round container"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 4,
+        "phrase": "Round dish",
+        "score": 0.360920077841677,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.360920077841677,
+            "Round dish"
+          ],
+          [
+            0.17380880376422983,
+            "Dark container"
+          ],
+          [
+            0.16709229335018097,
+            "Black circular object"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 6,
+        "phrase": "Deep serving dish",
+        "score": 0.17922177008895676,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.17922177008895676,
+            "Deep serving dish"
+          ],
+          [
+            0.13919228308313633,
+            "Empty mixing bowl"
+          ],
+          [
+            0.09630787892170745,
+            "Black round bowl"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 8,
+        "phrase": "Ceramic food bowl",
+        "score": 0.5420125080055715,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5420125080055715,
+            "Ceramic food bowl"
+          ],
+          [
+            0.49409314368999263,
+            "Deep serving bowl"
+          ],
+          [
+            0.3328107986454949,
+            "Black bowl"
+          ]
+        ]
+      }
+    ],
+    "plate_1": [
+      {
+        "suite": "spatial",
+        "task_id": 0,
+        "phrase": "Round plate",
+        "score": 0.8026605127539832,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.8026605127539832,
+            "Round plate"
+          ],
+          [
+            0.7567497893611295,
+            "Dinner plate"
+          ],
+          [
+            0.7164818044258268,
+            "Empty ceramic plate"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 1,
+        "phrase": "Round plate",
+        "score": 0.7472797728948346,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7472797728948346,
+            "Round plate"
+          ],
+          [
+            0.5359375834107651,
+            "White plate"
+          ],
+          [
+            0.5151194920669352,
+            "Flat dish"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 2,
+        "phrase": "Circular item",
+        "score": 0.7954160090412175,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7954160090412175,
+            "Circular item"
+          ],
+          [
+            0.7647452275000607,
+            "Round plate"
+          ],
+          [
+            0.7521195224188864,
+            "Dinner plate"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 3,
+        "phrase": "round plate",
+        "score": 0.7151050570982488,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7151050570982488,
+            "round plate"
+          ],
+          [
+            0.6361449160546568,
+            "dinner plate"
+          ],
+          [
+            0.416510150220266,
+            "flat dish"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 4,
+        "phrase": "Flat plate",
+        "score": 0.716135802850952,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.716135802850952,
+            "Flat plate"
+          ],
+          [
+            0.6978660462776293,
+            "Dinner plate"
+          ],
+          [
+            0.5180242875111284,
+            "Ceramic plate"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 5,
+        "phrase": "Dinner plate",
+        "score": 0.774449044358463,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.774449044358463,
+            "Dinner plate"
+          ],
+          [
+            0.6081144287377379,
+            "Round dish"
+          ],
+          [
+            0.5252231583872179,
+            "Flat surface"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 6,
+        "phrase": "Dinner plate",
+        "score": 0.6478163012740994,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.6478163012740994,
+            "Dinner plate"
+          ],
+          [
+            0.5120820215496192,
+            "Flat plate"
+          ],
+          [
+            0.45699736714127237,
+            "Round dish"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 7,
+        "phrase": "round flat dish",
+        "score": 0.7295145056143557,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7295145056143557,
+            "round flat dish"
+          ],
+          [
+            0.6713232862578574,
+            "plate"
+          ],
+          [
+            0.4505819459086153,
+            "empty plate"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 8,
+        "phrase": "Round plate",
+        "score": 0.8048013826261099,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.8048013826261099,
+            "Round plate"
+          ],
+          [
+            0.740914779524798,
+            "Food plate"
+          ],
+          [
+            0.5245953451531364,
+            "White plate"
+          ]
+        ]
+      },
+      {
+        "suite": "spatial",
+        "task_id": 9,
+        "phrase": "Round plate",
+        "score": 0.748843604137759,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.748843604137759,
+            "Round plate"
+          ],
+          [
+            0.6873230389913103,
+            "Dinner plate"
+          ],
+          [
+            0.6123709702553851,
+            "The plate"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 5,
+        "phrase": "Ceramic dinner plate",
+        "score": 0.7499536097204165,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7499536097204165,
+            "Ceramic dinner plate"
+          ],
+          [
+            0.6678005124791396,
+            "Flat serving dish"
+          ],
+          [
+            0.46286707769842667,
+            "Circular food plate"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 8,
+        "phrase": "Dinner plate",
+        "score": 0.785595649317346,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.785595649317346,
+            "Dinner plate"
+          ],
+          [
+            0.7382020316040266,
+            "Round flat plate"
+          ],
+          [
+            0.7040560297333935,
+            "Ceramic serving plate"
+          ]
+        ]
+      }
+    ],
+    "alphabet_soup_1": [
+      {
+        "suite": "object",
+        "task_id": 0,
+        "phrase": "Canned alphabet soup",
+        "score": 0.6621029831655952,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.6621029831655952,
+            "Canned alphabet soup"
+          ],
+          [
+            0.36658538899042065,
+            "Metal food cylinder"
+          ],
+          [
+            0.10788049302858799,
+            "Pantry soup item"
+          ]
+        ]
+      }
+    ],
+    "cream_cheese_1": [
+      {
+        "suite": "object",
+        "task_id": 1,
+        "phrase": "Rectangular cheese",
+        "score": 0.03294337759933441,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.03294337759933441,
+            "Rectangular cheese"
+          ],
+          [
+            0.0036482546919202005,
+            "Foil wrapped food"
+          ],
+          [
+            0.0,
+            "White cream cheese"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 6,
+        "phrase": "Foil-wrapped food",
+        "score": 0.0034510850422415328,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.0034510850422415328,
+            "Foil-wrapped food"
+          ],
+          [
+            0.0,
+            "White dairy block"
+          ],
+          [
+            0.0,
+            "Soft cheese brick"
+          ]
+        ]
+      }
+    ],
+    "salad_dressing_1": [
+      {
+        "suite": "object",
+        "task_id": 2,
+        "phrase": "Small liquid bottle",
+        "score": 0.9097524620109172,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.9097524620109172,
+            "Small liquid bottle"
+          ],
+          [
+            0.7237281417556748,
+            "Dressing bottle"
+          ],
+          [
+            0.7106643963614127,
+            "Plastic food item"
+          ]
+        ]
+      }
+    ],
+    "bbq_sauce_1": [
+      {
+        "suite": "object",
+        "task_id": 3,
+        "phrase": "Brown condiment bottle",
+        "score": 0.8685385411725915,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.8685385411725915,
+            "Brown condiment bottle"
+          ],
+          [
+            0.4397784569663359,
+            "Dark brown bottle"
+          ],
+          [
+            0.2938157123503889,
+            "BBQ sauce bottle"
+          ]
+        ]
+      }
+    ],
+    "ketchup_1": [
+      {
+        "suite": "object",
+        "task_id": 4,
+        "phrase": "Condiment bottle",
+        "score": 0.8621267917487095,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.8621267917487095,
+            "Condiment bottle"
+          ],
+          [
+            0.42972393814138843,
+            "Plastic red bottle"
+          ],
+          [
+            0.10580995246539325,
+            "Squeeze bottle"
+          ]
+        ]
+      }
+    ],
+    "tomato_sauce_1": [
+      {
+        "suite": "object",
+        "task_id": 5,
+        "phrase": "Food condiment",
+        "score": 0.20886280941518587,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.20886280941518587,
+            "Food condiment"
+          ],
+          [
+            0.09571161920642839,
+            "Cylindrical red jar"
+          ],
+          [
+            0.0704566208207226,
+            "Glass tomato bottle"
+          ]
+        ]
+      }
+    ],
+    "butter_1": [
+      {
+        "suite": "object",
+        "task_id": 6,
+        "phrase": "Food item",
+        "score": 0.7407558098569486,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7407558098569486,
+            "Food item"
+          ],
+          [
+            0.1001270642728574,
+            "Butter block"
+          ],
+          [
+            0.05030305362705096,
+            "Cooking ingredient"
+          ]
+        ]
+      }
+    ],
+    "milk_1": [
+      {
+        "suite": "object",
+        "task_id": 7,
+        "phrase": "Rectangular milk box",
+        "score": 0.7686277939928553,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.7686277939928553,
+            "Rectangular milk box"
+          ],
+          [
+            0.14770300956600096,
+            "White milk carton"
+          ],
+          [
+            0.03164323859730524,
+            "Milk container"
+          ]
+        ]
+      }
+    ],
+    "chocolate_pudding_1": [
+      {
+        "suite": "object",
+        "task_id": 8,
+        "phrase": "Chocolate snack",
+        "score": 0.10507240056573756,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.10507240056573756,
+            "Chocolate snack"
+          ],
+          [
+            0.0989507564543287,
+            "Dark brown treat"
+          ],
+          [
+            0.09880757019298358,
+            "Sweet brown food"
+          ]
+        ]
+      }
+    ],
+    "orange_juice_1": [
+      {
+        "suite": "object",
+        "task_id": 9,
+        "phrase": "Orange juice",
+        "score": 0.5572154734780421,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5572154734780421,
+            "Orange juice"
+          ],
+          [
+            0.48667406928261653,
+            "Juice carton"
+          ],
+          [
+            0.4537580672663137,
+            "Yellow beverage"
+          ]
+        ]
+      }
+    ],
+    "wine_bottle_1": [
+      {
+        "suite": "goal",
+        "task_id": 2,
+        "phrase": "Cylindrical wine",
+        "score": 0.5787440372552162,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5787440372552162,
+            "Cylindrical wine"
+          ],
+          [
+            0.5745977900203569,
+            "Dark green bottle"
+          ],
+          [
+            0.47783624592840396,
+            "Glass wine bottle"
+          ]
+        ]
+      },
+      {
+        "suite": "goal",
+        "task_id": 9,
+        "phrase": "Dark liquid bottle",
+        "score": 0.5914741277942684,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.5914741277942684,
+            "Dark liquid bottle"
+          ],
+          [
+            0.3885904423521455,
+            "Green glass bottle"
+          ],
+          [
+            0.33084239626239753,
+            "Tall wine container"
+          ]
+        ]
+      }
+    ],
+    "flat_stove_1": [
+      {
+        "suite": "goal",
+        "task_id": 7,
+        "phrase": "Cooking surface",
+        "score": 0.351202945846445,
+        "runs": 3,
+        "full_ranking": [
+          [
+            0.351202945846445,
+            "Cooking surface"
+          ],
+          [
+            0.313621451463027,
+            "Kitchen appliance"
+          ],
+          [
+            0.28517784331005563,
+            "Black cooktop"
+          ]
+        ]
+      }
+    ]
+  },
+  "best_per_object": {
+    "akita_black_bowl_1": {
+      "best_phrase": "black bowl",
+      "mean_score": 0.66,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.66,
+          "black bowl"
+        ],
+        [
+          0.58,
+          "kitchen bowl"
+        ],
+        [
+          0.54,
+          "Dark serving bowl"
+        ]
+      ]
+    },
+    "plate_1": {
+      "best_phrase": "Circular item",
+      "mean_score": 0.7954160090412175,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.7954160090412175,
+          "Circular item"
+        ],
+        [
+          0.7746573080361594,
+          "Round plate"
+        ],
+        [
+          0.7499536097204165,
+          "Ceramic dinner plate"
+        ]
+      ]
+    },
+    "alphabet_soup_1": {
+      "best_phrase": "Canned alphabet soup",
+      "mean_score": 0.6621029831655952,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.6621029831655952,
+          "Canned alphabet soup"
+        ],
+        [
+          0.36658538899042065,
+          "Metal food cylinder"
+        ],
+        [
+          0.10788049302858799,
+          "Pantry soup item"
+        ]
+      ]
+    },
+    "cream_cheese_1": {
+      "best_phrase": "small red cheese box",
+      "mean_score": 0.03,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.03,
+          "small red cheese box"
+        ],
+        [
+          0.03,
+          "Foil-wrapped food"
+        ],
+        [
+          0.03,
+          "Rectangular cheese"
+        ]
+      ]
+    },
+    "salad_dressing_1": {
+      "best_phrase": "Small liquid bottle",
+      "mean_score": 0.9097524620109172,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.9097524620109172,
+          "Small liquid bottle"
+        ],
+        [
+          0.7237281417556748,
+          "Dressing bottle"
+        ],
+        [
+          0.7106643963614127,
+          "Plastic food item"
+        ]
+      ]
+    },
+    "bbq_sauce_1": {
+      "best_phrase": "Brown condiment bottle",
+      "mean_score": 0.8685385411725915,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.8685385411725915,
+          "Brown condiment bottle"
+        ],
+        [
+          0.4397784569663359,
+          "Dark brown bottle"
+        ],
+        [
+          0.2938157123503889,
+          "BBQ sauce bottle"
+        ]
+      ]
+    },
+    "ketchup_1": {
+      "best_phrase": "Condiment bottle",
+      "mean_score": 0.8621267917487095,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.8621267917487095,
+          "Condiment bottle"
+        ],
+        [
+          0.42972393814138843,
+          "Plastic red bottle"
+        ],
+        [
+          0.10580995246539325,
+          "Squeeze bottle"
+        ]
+      ]
+    },
+    "tomato_sauce_1": {
+      "best_phrase": "Food condiment",
+      "mean_score": 0.20886280941518587,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.20886280941518587,
+          "Food condiment"
+        ],
+        [
+          0.09571161920642839,
+          "Cylindrical red jar"
+        ],
+        [
+          0.0704566208207226,
+          "Glass tomato bottle"
+        ]
+      ]
+    },
+    "butter_1": {
+      "best_phrase": "Food item",
+      "mean_score": 0.7407558098569486,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.7407558098569486,
+          "Food item"
+        ],
+        [
+          0.1001270642728574,
+          "Butter block"
+        ],
+        [
+          0.05030305362705096,
+          "Cooking ingredient"
+        ]
+      ]
+    },
+    "milk_1": {
+      "best_phrase": "Rectangular milk box",
+      "mean_score": 0.7686277939928553,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.7686277939928553,
+          "Rectangular milk box"
+        ],
+        [
+          0.14770300956600096,
+          "White milk carton"
+        ],
+        [
+          0.03164323859730524,
+          "Milk container"
+        ]
+      ]
+    },
+    "chocolate_pudding_1": {
+      "best_phrase": "Chocolate snack",
+      "mean_score": 0.10507240056573756,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.10507240056573756,
+          "Chocolate snack"
+        ],
+        [
+          0.0989507564543287,
+          "Dark brown treat"
+        ],
+        [
+          0.09880757019298358,
+          "Sweet brown food"
+        ]
+      ]
+    },
+    "orange_juice_1": {
+      "best_phrase": "Orange juice",
+      "mean_score": 0.5572154734780421,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.5572154734780421,
+          "Orange juice"
+        ],
+        [
+          0.48667406928261653,
+          "Juice carton"
+        ],
+        [
+          0.4537580672663137,
+          "Yellow beverage"
+        ]
+      ]
+    },
+    "wine_bottle_1": {
+      "best_phrase": "Dark liquid bottle",
+      "mean_score": 0.5914741277942684,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.5914741277942684,
+          "Dark liquid bottle"
+        ],
+        [
+          0.5787440372552162,
+          "Cylindrical wine"
+        ],
+        [
+          0.5745977900203569,
+          "Dark green bottle"
+        ]
+      ]
+    },
+    "flat_stove_1": {
+      "best_phrase": "induction stove",
+      "mean_score": 0.4,
+      "n_observations": 0,
+      "top3": [
+        [
+          0.4,
+          "induction stove"
+        ],
+        [
+          0.35,
+          "Cooking surface"
+        ],
+        [
+          0.3,
+          "induction cooktop"
+        ]
+      ]
+    },
+    "stove_1": {
+      "best_phrase": "induction stove",
+      "mean_score": 0.4,
+      "n_observations": 0,
+      "top3": [
+        [
+          0.4,
+          "induction stove"
+        ]
+      ]
+    },
+    "wooden_cabinet_1": {
+      "best_phrase": "wooden cabinet",
+      "mean_score": 0.5,
+      "n_observations": 0,
+      "top3": [
+        [
+          0.5,
+          "wooden cabinet"
+        ]
+      ]
+    },
+    "stove_button_1": {
+      "best_phrase": "induction stove button",
+      "mean_score": 0.3,
+      "n_observations": 0,
+      "top3": [
+        [
+          0.3,
+          "induction stove button"
+        ]
+      ]
+    },
+    "knob_1": {
+      "best_phrase": "induction stove button",
+      "mean_score": 0.3,
+      "n_observations": 0,
+      "top3": [
+        [
+          0.3,
+          "induction stove button"
+        ]
+      ]
+    },
+    "akita_black_bowl_2": {
+      "best_phrase": "black bowl",
+      "mean_score": 0.66,
+      "n_observations": 2,
+      "top3": [
+        [
+          0.66,
+          "black bowl"
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,103 @@
+<mujoco model="pick_place_basic">
+  <!-- SPARK scene: Basic pick and place with mesh object from object_sim -->
+  <include file="ur_gripper.xml"/>
+
+  <compiler angle="radian" autolimits="true" />
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <default>
+    <default class="object_visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="1"/>
+    </default>
+    <default class="object_collision">
+      <geom type="mesh" density="1000" contype="1" conaffinity="1" friction="1 0.5 0.01" condim="4" group="3"/>
+    </default>
+  </default>
+
+  <asset>
+    <!-- Environment textures -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8" rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="floor_tex" builtin="checker" rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512" mark="cross" markrgb="0.5 0.5 0.55"/>
+    <material name="floor_mat" texture="floor_tex" texrepeat="15 15" reflectance="0.2"/>
+    <material name="table_ceramic" rgba="0.9 0.9 0.92 1" reflectance="0.0" shininess="0.0"/>
+    <material name="table_legs_metal" rgba="0.5 0.5 0.55 1" reflectance="0.6" shininess="0.8"/>
+    <material name="walls_mat" rgba="0.9 0.9 0.92 1" reflectance="0.1"/>
+    <material name="target_zone" rgba="0.2 0.8 0.2 0.3" reflectance="0.0"/>
+    <material name="pedestal_mat" rgba="0.3 0.4 0.7 1" reflectance="0.5"/>
+
+    <!-- Apple meshes -->
+    <mesh name="apple_visual" file="../../../object_sim/apple/apple.stl" scale="1 1 1"/>
+    <mesh name="apple_col0" file="../../../object_sim/apple/contact0.stl" scale="1 1 1"/>
+    <mesh name="apple_col1" file="../../../object_sim/apple/contact1.stl" scale="1 1 1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Soft distributed lighting -->
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="-2 2 3" dir="0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+
+    <geom condim="3" group="1" material="floor_mat" name="floor" pos="0 0 0" size="3 3 .125" type="plane"/>
+
+
+    <!-- Robot pedestal -->
+    <body name="robot_pedestal" pos="-0.6 0 0.125">
+      <geom type="box" size="0.3 0.2 0.1" material="pedestal_mat"/>
+    </body>
+
+    <!-- Table -->
+    <body name="table" pos="0.6 0 0.4">
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" group="0" friction="1 0.005 0.0001"/>
+      <geom pos="0 0 0" size="0.5 0.4 0.02" type="box" conaffinity="0" contype="0" group="1" material="table_ceramic"/>
+      <geom pos="0.45 0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="0.45 -0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.45 -0.35 -0.2" size="0.025 0.2" type="cylinder" conaffinity="0" contype="0" group="1" material="table_legs_metal"/>
+      <!-- Target zone (visual) -->
+      <geom pos="0.3 0 0.021" size="0.08 0.08 0.001" type="box" conaffinity="0" contype="0" group="1" material="target_zone"/>
+    </body>
+
+    <!-- Apple to pick (mesh-based) -->
+    <body name="apple" pos="0.8 0 0.46">
+      <freejoint name="apple_free"/>
+      <geom name="apple_vis" mesh="apple_visual" rgba="0.9 0.15 0.1 1" class="object_visual"/>
+      <geom name="apple_col_0" mesh="apple_col0" class="object_collision" rgba="0.9 0.15 0.1 0"/>
+      <geom name="apple_col_1" mesh="apple_col1" class="object_collision" rgba="0.9 0.15 0.1 0"/>
+      <inertial pos="0 0 0" mass="0.15" diaginertia="0.00005 0.00005 0.00005"/>
+    </body>
+
+    <!-- Cameras -->
+    <body name="camera1" pos="0.6 0.0 1.8">
+      <camera name="camera1" fovy="50" pos="0 0 0" xyaxes="1 0 0 0 0 1"/>
+    </body>
+    <body name="camera2" pos="0.550 -1.473 1.462">
+      <camera name="camera2" fovy="60" pos="0 0 0" xyaxes="1.000 0.013 0.000 -0.008 0.612 0.791"/>
+    </body>
+    <body name="camera3" pos="0.615 1.473 1.024">
+      <camera name="camera3" fovy="60" pos="0 0 0" xyaxes="-1.000 0.017 0.000 -0.008 -0.438 0.899"/>
+    </body>
+
+    <!-- Keypoint markers -->
+    <body name="keypoint_markers" pos="0 0 0">
+      <site name="keypoint_0" pos="0 0 -10" size="0.01" rgba="1 0 0 0" type="sphere"/>
+      <site name="keypoint_1" pos="0 0 -10" size="0.01" rgba="1 0.2 0 0" type="sphere"/>
+      <site name="keypoint_2" pos="0 0 -10" size="0.01" rgba="1 0.4 0 0" type="sphere"/>
+      <site name="keypoint_3" pos="0 0 -10" size="0.01" rgba="1 0.6 0 0" type="sphere"/>
+      <site name="keypoint_4" pos="0 0 -10" size="0.01" rgba="1 0.8 0 0" type="sphere"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home" qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0  0 0 0 0 0 0 0 0  0.8 0 0.46 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0  0"/>
+  </keyframe>
+</mujoco>

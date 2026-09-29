@@ -1,0 +1,47 @@
+# B3: Role-asymmetric handoff-and-plug
+# Left arm picks up the device + holds it stationary; right arm
+# picks up the plug, brings it to the device, and compliantly inserts.
+# Differentiator: combines bimanual handover (AnyBimanual) + compliant
+# insertion (Fabrica) in a single neurosymbolic BT.
+task: plug the connector into the socket on the device
+tree:
+  type: sequence
+  children:
+    - type: pick_with_arm
+      params:
+        arm: left
+        keypoint_label: "device"
+        target_width: 0.030
+        force: 18
+    - type: move_to_keypoint_arm
+      params: {arm: left, keypoint_label: "workspace center", offset_z: 0.20}
+    - type: parallel
+      children:
+        - type: hold_in_place
+          params: {arm: left, dwell: 12.0}
+        - type: sequence
+          children:
+            - type: pick_with_arm
+              params:
+                arm: right
+                keypoint_label: "plug"
+                target_width: 0.012
+                force: 25
+                grip_end: back
+            - type: move_to_keypoint_arm
+              params:
+                arm: right
+                keypoint_label: "socket"
+                offset_z: 0.10
+            - type: compliant_insert
+              params:
+                arm: right
+                target_label: "socket"
+                max_descent_m: 0.04
+                seat_force_n: 8.0
+                wiggle_amplitude_m: 0.003
+                approach_offset_z: 0.05
+            - type: release_arm
+              params: {arm: right, tilt_angle: 0}
+    - type: place_with_arm
+      params: {arm: left, tilt_angle: 0}

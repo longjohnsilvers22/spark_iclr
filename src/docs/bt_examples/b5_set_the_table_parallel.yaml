@@ -1,0 +1,49 @@
+# B5: Set the table - parallel sort-and-place
+# Left arm places the fork on the left of the plate; right arm
+# simultaneously places the knife on the right. Demonstrates the
+# parallel node executing two independent pick-place subtrees with an
+# implicit join at the end.
+task: set the table with the fork on the left of the plate and the knife on the right
+tree:
+  type: sequence
+  children:
+    - type: parallel
+      children:
+        - type: sequence
+          children:
+            - type: pick_with_arm
+              params:
+                arm: left
+                keypoint_label: "fork"
+                target_width: 0.012
+                force: 35
+                grip_end: back
+            - type: move_to_keypoint_arm
+              params:
+                arm: left
+                keypoint_label: "plate"
+                offset_x: 0.0
+                offset_y: 0.12
+                offset_z: 0.05
+            - type: release_arm
+              params: {arm: left, tilt_angle: 0}
+        - type: sequence
+          children:
+            - type: pick_with_arm
+              params:
+                arm: right
+                keypoint_label: "knife handle"
+                target_width: 0.012
+                force: 35
+                grip_end: back
+            - type: move_to_keypoint_arm
+              params:
+                arm: right
+                keypoint_label: "plate"
+                offset_x: 0.0
+                offset_y: -0.12
+                offset_z: 0.05
+            - type: release_arm
+              params: {arm: right, tilt_angle: 0}
+    - type: sync_barrier
+      params: {name: post_place}

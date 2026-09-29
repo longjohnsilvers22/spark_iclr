@@ -1,0 +1,174 @@
+<mujoco model="perception_test_scene">
+  <!-- Include the robot with gripper -->
+  <include file="ur_gripper.xml" pos="-0.6 0 0.3"/>
+
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="640" offheight="480"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8" rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker" rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512" mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20" reflectance="0.3" shininess="0.1"/>
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="pedestal_mat" rgba="0.3 0.4 0.7 1" reflectance="0.5" shininess="0.4"/>
+    <material name="wheel_mat" rgba="0.2 0.2 0.25 1" reflectance="0.8" shininess="0.9"/>
+    <material name="red_block" rgba="0.95 0.2 0.2 1" reflectance="0.3" shininess="0.5"/>
+    <material name="blue_block" rgba="0.2 0.3 0.95 1" reflectance="0.3" shininess="0.5"/>
+    <material name="green_block" rgba="0.2 0.9 0.3 1" reflectance="0.3" shininess="0.5"/>
+    <material name="yellow_block" rgba="0.95 0.85 0.2 1" reflectance="0.3" shininess="0.5"/>
+    <material name="purple_cylinder" rgba="0.7 0.2 0.9 1" reflectance="0.3" shininess="0.5"/>
+    <material name="orange_ball" rgba="1.0 0.6 0.2 1" reflectance="0.4" shininess="0.6"/>
+    <material name="lab_wall" rgba="0.85 0.9 0.95 1" reflectance="0.1"/>
+    <material name="poster_mat" rgba="1 1 1 1"/>
+
+    <!-- Simple bucket materials -->
+    <material name="bucket_wall_mat" rgba="0.6 0.4 0.2 0.7" specular="0.3" shininess="0.2"/>
+    <material name="bucket_bottom_mat" rgba="0.5 0.35 0.15 1" specular="0.2" shininess="0.1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Softer lighting to reduce shadows -->
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="-2 2 3" dir="0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Robot pedestal with prism base and wheels -->
+    <body name="robot_pedestal" pos="-0.6 0 0.125">
+      <geom name="pedestal_base" type="box" size="0.35 0.25 0.1" pos="0 0 0" material="pedestal_mat"/>
+      <!-- Wheels -->
+      <geom name="wheel_fl" type="cylinder" size="0.05 0.02" pos="0.25 0.18 -0.1" euler="0 1.5708 0" material="wheel_mat"/>
+      <geom name="wheel_fr" type="cylinder" size="0.05 0.02" pos="0.25 -0.18 -0.1" euler="0 1.5708 0" material="wheel_mat"/>
+      <geom name="wheel_bl" type="cylinder" size="0.05 0.02" pos="-0.25 0.18 -0.1" euler="0 1.5708 0" material="wheel_mat"/>
+      <geom name="wheel_br" type="cylinder" size="0.05 0.02" pos="-0.25 -0.18 -0.1" euler="0 1.5708 0" material="wheel_mat"/>
+    </body>
+
+    <!-- Main work table (larger, in front of robot) -->
+    <body name="table" pos="0.6 0 0.4">
+      <geom name="table_top" type="box" size="0.5 0.4 0.02" pos="0 0 0" material="table_mat"/>
+      <geom name="table_leg1" type="cylinder" size="0.03 0.2" pos="0.45 0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg2" type="cylinder" size="0.03 0.2" pos="0.45 -0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg3" type="cylinder" size="0.03 0.2" pos="-0.45 0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg4" type="cylinder" size="0.03 0.2" pos="-0.45 -0.35 -0.2" material="table_mat"/>
+    </body>
+
+    <!-- Graspable objects on main table -->
+    <body name="red_block" pos="0.35 -0.15 0.445">
+      <freejoint name="red_block_free"/>
+      <geom name="red_block_geom" type="box" size="0.025 0.025 0.025" material="red_block"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="blue_block" pos="0.35 0.15 0.445">
+      <freejoint name="blue_block_free"/>
+      <geom name="blue_block_geom" type="box" size="0.025 0.025 0.025" material="blue_block"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="green_block" pos="0.45 0.1 0.445">
+      <freejoint name="green_block_free"/>
+      <geom name="green_block_geom" type="box" size="0.025 0.025 0.025" material="green_block"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="yellow_block" pos="0.5 -0.1 0.445">
+      <freejoint name="yellow_block_free"/>
+      <geom name="yellow_block_geom" type="box" size="0.03 0.03 0.02" material="yellow_block"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.04" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <body name="purple_cylinder" pos="0.4 0 0.46">
+      <freejoint name="purple_cylinder_free"/>
+      <geom name="purple_cylinder_geom" type="cylinder" size="0.02 0.04" material="purple_cylinder"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.06" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <!-- Orange ball on the table -->
+    <body name="orange_ball" pos="0.55 0.05 0.45">
+      <freejoint name="orange_ball_free"/>
+      <geom name="orange_ball_geom" type="sphere" size="0.025" material="orange_ball"
+            condim="6" friction="1 0.5 0.0001" solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.04" diaginertia="0.00001 0.00001 0.00001"/>
+    </body>
+
+    <!-- Bird's eye camera - directly above table, centered on x -->
+    <body name="camera1" pos="0.6 0.0 1.8">
+        <camera name="camera1" fovy="50" pos="0 0 0" xyaxes="1 0 0 0 0 1"/>
+    </body>
+
+    <!-- Front camera - looking at table from front (negative y side) -->
+    <body name="camera2" pos="0.550 -1.473 1.462">
+        <camera name="camera2" fovy="60" pos="0 0 0" xyaxes="1.000 0.013 0.000 -0.008 0.612 0.791"/>
+    </body>
+
+    <!-- Back camera - looking at table from back (positive y side) -->
+    <body name="camera3" pos="0.615 1.473 1.024">
+        <camera name="camera3" fovy="60" pos="0 0 0" xyaxes="-1.000 0.017 0.000 -0.008 -0.438 0.899"/>
+    </body>
+    
+    <!-- Lab decorations - keeping only the cloudy back wall -->
+    <body name="back_wall" pos="0 -2 1">
+      <geom name="wall_back" type="box" size="3 0.05 1" material="lab_wall"/>
+    </body>
+
+    <!-- Simple primitive bucket (clearly hollow, no top plane) -->
+    <!-- Square bucket ~10cm x 10cm x 8cm tall, positioned on table surface (z=0.42) -->
+    <body name="bucket" pos="0.25 0 0.42">
+      <!-- Bottom plate (visual + collision) -->
+      <geom name="bucket_bottom" type="box" size="0.05 0.05 0.003" pos="0 0 0.003"
+            material="bucket_bottom_mat" condim="6" friction="0.8 0.3 0.001"/>
+
+      <!-- Wall segments (4 boxes forming hollow bucket walls - visual + collision) -->
+      <!-- Each wall: 10cm wide (full side), 0.5cm thick, 8cm tall -->
+      <geom name="bucket_wall_front" type="box" size="0.05 0.005 0.04" pos="0 0.045 0.046"
+            material="bucket_wall_mat" condim="6" friction="0.8 0.3 0.001"/>
+      <geom name="bucket_wall_back" type="box" size="0.05 0.005 0.04" pos="0 -0.045 0.046"
+            material="bucket_wall_mat" condim="6" friction="0.8 0.3 0.001"/>
+      <geom name="bucket_wall_left" type="box" size="0.005 0.045 0.04" pos="-0.045 0 0.046"
+            material="bucket_wall_mat" condim="6" friction="0.8 0.3 0.001"/>
+      <geom name="bucket_wall_right" type="box" size="0.005 0.045 0.04" pos="0.045 0 0.046"
+            material="bucket_wall_mat" condim="6" friction="0.8 0.3 0.001"/>
+
+      <!-- Target site inside bucket for placement -->
+      <site name="bucket_target" pos="0 0 0.05" size="0.04 0.04 0.001" rgba="0 0 0 0" type="box"/>
+    </body>
+
+    <body name="keypoint_markers" pos="0 0 0">
+      <site name="keypoint_0" pos="0 0 -10" size="0.01" rgba="1 0 0 0" type="sphere"/>
+      <site name="keypoint_1" pos="0 0 -10" size="0.01" rgba="1 0.2 0 0" type="sphere"/>
+      <site name="keypoint_2" pos="0 0 -10" size="0.01" rgba="1 0.4 0 0" type="sphere"/>
+      <site name="keypoint_3" pos="0 0 -10" size="0.01" rgba="1 0.6 0 0" type="sphere"/>
+      <site name="keypoint_4" pos="0 0 -10" size="0.01" rgba="1 0.8 0 0" type="sphere"/>
+      <site name="keypoint_5" pos="0 0 -10" size="0.01" rgba="0.8 1 0 0" type="sphere"/>
+      <site name="keypoint_6" pos="0 0 -10" size="0.01" rgba="0.6 1 0 0" type="sphere"/>
+      <site name="keypoint_7" pos="0 0 -10" size="0.01" rgba="0.4 1 0 0" type="sphere"/>
+      <site name="keypoint_8" pos="0 0 -10" size="0.01" rgba="0.2 1 0 0" type="sphere"/>
+      <site name="keypoint_9" pos="0 0 -10" size="0.01" rgba="0 1 0 0" type="sphere"/>
+      <site name="keypoint_10" pos="0 0 -10" size="0.01" rgba="0 1 0.2 0" type="sphere"/>
+    </body>
+
+  </worldbody>
+
+  <keyframe>
+    <!-- Home position with robot upright and objects on table -->
+    <!-- Robot joints (6) + gripper joints (8) + 6 objects with freejoint (7 DOF each = 42) = 56 total -->
+    <key name="home"
+         qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0  0 0 0 0 0 0 0 0  0.35 -0.15 0.445 1 0 0 0  0.35 0.15 0.445 1 0 0 0  0.45 0.1 0.445 1 0 0 0  0.5 -0.1 0.445 1 0 0 0  0.4 0 0.46 1 0 0 0  0.55 0.05 0.45 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0  0"/>
+  </keyframe>
+
+</mujoco>

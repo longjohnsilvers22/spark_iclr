@@ -1,0 +1,27 @@
+# Plushie pickup task -- UR10e + Robotiq 2F-85
+# Pick up a plushie and place it in the box.
+task: pick up the plushie and put it in the box
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "plushie"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "plushie"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 30
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.15}
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "box"
+        offset_z: 0.10
+    - type: release
+      params: {}
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}

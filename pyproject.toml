@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spark-robotics"
+version = "0.1.0"
+description = "SPARK: training-free neurosymbolic manipulation — open-vocabulary perception + one LLM behavior-tree call + IK control, across three real embodiments."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "SPARK contributors" }]
+keywords = ["robotics", "manipulation", "vlm", "behavior-trees", "sam", "franka", "ur10e"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core runtime, hardware-agnostic. Versions track the pinned environment.yml.
+# NOTE: torch / torchvision are NOT declared here — they must come from the
+# pytorch.org CUDA (cu130) wheel index via setup_spark_conda.bash, or the pip
+# resolver silently pulls a CPU build. Install them before `pip install`.
+dependencies = [
+    "numpy==1.26.4",          # pinned <2 for EquiGraspFlow
+    "scipy==1.17.1",
+    "opencv-python==4.13.0.92",
+    "pillow==12.1.1",
+    "scikit-image==0.26.0",
+    "pyyaml==6.0.3",
+    "requests==2.33.1",
+    "tqdm==4.67.3",
+    "tyro==1.0.12",           # config CLI
+    "lark>=1.1.0",            # typed BT-DSL grammar (spark_dsl)
+    "matplotlib==3.10.8",
+    "imageio==2.37.3",
+    "imageio-ffmpeg==0.6.0",
+    "fastapi==0.136.3",        # web UI + REST/WebSocket server
+    "uvicorn==0.47.0",
+    "pydantic==2.12.5",
+    "websockets==16.0",
+]
+
+[project.optional-dependencies]
+# LLM planners (choose per deployment; the planner imports google.genai).
+planning = ["google-genai==1.75.0", "google-generativeai==0.8.6", "openai>=1.0.0"]
+
+# Perception stack. SAM3 + DA3 are installed editable from source (see
+# SETUP.md); these are the pip-resolvable pieces.
+perception = ["huggingface_hub>=0.20.0", "transformers>=4.35.0", "datasets>=2.14.0"]
+
+# EquiGraspFlow SE(3) grasp generation (optional; heavy).
+grasp = ["e3nn==0.6.0", "omegaconf==2.3.0", "hydra-core==1.3.2", "open3d==0.19.0", "roma==1.5.6", "tensorboardX==2.6.5"]
+
+# MuJoCo simulation + benchmarks (spark_sim, spark_bench).
+sim = ["mujoco==3.3.7", "PyOpenGL==3.1.10", "h5py==3.16.0"]  # h5py: LIBERO-PRO init states
+
+# Joint-space IK descent (UR10e _movej_via_ik, FR3 fr3_ik_pyroki, CaP-Bench
+# Wipe). Without it the executor falls back to the Cartesian servo. CPU jax
+# is enough; see SETUP.md for the CUDA wheel.
+ik = [
+    "jax==0.10.2",
+    "jaxlie==1.5.0",
+    "jaxls @ git+https://github.com/brentyi/jaxls.git@50a58be88c5ef74532f09e3f55268b4f02c490e3",
+    "pyroki @ git+https://github.com/chungmin99/pyroki.git@388e43e1fc0d0ee382968d3dd72970fd62a0450c",
+    "viser==1.0.30",
+    "yourdfpy==0.0.60",
+    "robot_descriptions==2.0.0",
+    "jax_dataclasses==1.6.3",
+]
+
+# Rig cameras: Azure Kinect (pyk4a needs the k4a SDK) and RealSense.
+cameras = ["pyk4a==1.5.0", "pyrealsense2==2.57.7.10387"]
+
+# Bimanual Franka rig: ZMQ arm link and Dynamixel/SSG-48 grippers. The ZED SDK
+# (pyzed) is installed from Stereolabs, not pip; Spectral_BLDC etc. are in
+# src/spark_real/requirements-bimanual.txt.
+bimanual = ["pyzmq", "dynamixel-sdk"]
+
+# Trace-selector analysis (offline ranking model, no robot).
+analysis = ["scikit-learn", "pandas"]
+
+# Per-robot drivers — install only what your rig needs.
+#   ur10e   : ur-rtde (pip).
+#   franka  : franky-control is a LOCAL wheel (see SETUP.md), not on PyPI,
+#             so it is intentionally not pinned here.
+ur10e = ["ur-rtde>=1.5.6"]
+
+# Developer tooling: lint, format, test.
+dev = ["pytest>=8.0", "ruff>=0.6", "black>=24.0", "pre-commit>=3.5"]
+
+[project.urls]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["spark_real*", "spark_sim*", "spark_bench*", "spark_dsl*", "sam3_service*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+# Start conservative so the gate is adoptable on a large existing codebase:
+# pyflakes (F) + a subset of pycodestyle (E). Widen over time.
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line length handled by black/formatter, not enforced hard
+    "E741",  # ambiguous var names (l, I) appear in math/robotics code
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+# Hardware-free unit tests only by default; rig/GPU demos live under
+# tests/corl and are excluded.
+testpaths = ["src/spark_real/tests", "src/spark_dsl"]
+addopts = "-q"

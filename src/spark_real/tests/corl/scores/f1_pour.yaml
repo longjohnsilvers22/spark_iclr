@@ -1,0 +1,31 @@
+# CoRL F1: pour task.
+# Pre-baked BT score that dispatches through the production skill
+# registry via sim_pipeline.py. Exercises:
+#   - grasp_se3 (strategy=horizontal)  - sim version of horizontal grasp
+#   - pour                             - production pour primitive
+#   - release                          - production release
+#
+# Approach direction (-X, 0) means the gripper approaches from the +X
+# side of the cup and points -X (toward the robot base / world origin).
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "plastic cup"
+        strategy: horizontal
+        object_height_m: 0.11
+        force: 80
+        target_width: 0.060
+        pre_grasp_distance: 0.20
+        approach_dir_x: -1.0
+        approach_dir_y: 0.0
+    - type: pour
+      params:
+        source_label: "plastic cup"
+        target_label: bowl
+        pour_angle_rad: 0.9
+        target_fill_fraction: 0.7
+        max_pour_s: 4.0
+    - type: release
+      params: {}

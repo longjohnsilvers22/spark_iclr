@@ -1,0 +1,28 @@
+# Pens in container task -- UR10e + Robotiq 2F-85
+# Pick up pens and place them in the container.
+task: put the pens in the container
+tree:
+  type: sequence
+  children:
+    # Pick pen 1
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "pen"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "pen"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 40
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "container"
+        offset_z: 0.05
+    - type: release
+      params: {}
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}

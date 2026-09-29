@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SPARK * Primitive Library (TM Bag mockup)</title>
+<style>
+:root{
+  --bg-0:#080c10; --bg-1:#0c1018; --bg-2:#111820; --border:#1c2636;
+  --tx-1:#c8d0d8; --tx-2:#6a7888; --tx-3:#3a4858;
+  --magenta:#c89ad0; --magenta-30:rgba(200,154,208,.3);
+  --teal:#5b8dbe;   --teal-30:rgba(91,141,190,.3);
+  --amber:#d4a020;  --red:#f04040;
+  --mono:ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px var(--mono);color:var(--tx-1);
+  background:var(--bg-0);min-height:100vh;padding:32px}
+
+h1{font:600 22px var(--mono);color:var(--magenta);
+  margin:0 0 6px}
+h1 small{font:400 11px var(--mono);color:var(--tx-2)}
+.tagline{font:12px var(--mono);color:var(--tx-3);margin:0 0 22px}
+
+.bag{
+  width:780px;margin:0 auto;
+  background:var(--bg-1);
+  border:1px solid var(--magenta-30);border-radius:14px;
+  padding:22px;position:relative;
+}
+.bag::before{content:"";position:absolute;inset:6px;border-radius:10px;
+  border:1px solid rgba(200,154,208,.15);pointer-events:none}
+
+.bag-h{font:600 16px var(--mono);color:var(--magenta);
+  text-align:center;border-bottom:1px solid var(--magenta-30);
+  padding-bottom:12px;margin-bottom:14px}
+.bag-h small{display:block;font:500 11px var(--mono);color:var(--tx-2);
+  margin-top:4px}
+
+.tabs{display:flex;gap:6px;justify-content:center;margin-bottom:18px}
+.tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;
+  color:var(--tx-2);cursor:pointer;font:600 10px var(--mono);
+  background:rgba(255,255,255,.02);transition:.15s}
+.tab.active{background:var(--magenta-30);border-color:var(--magenta);color:var(--magenta)}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.slot{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:6px;padding:10px 12px;position:relative;
+  transition:.15s;min-height:78px;
+}
+.slot.learned{border-color:var(--teal)}
+.slot.locked{opacity:.45;background:rgba(255,255,255,.02)}
+.slot.newly-learned{border-color:var(--magenta)}
+.slot .num{position:absolute;top:6px;right:8px;font:600 9px var(--mono);
+  color:var(--tx-3)}
+.slot .glyph{font-size:22px;margin-bottom:4px;display:inline-block}
+.slot .name{font:600 12px var(--mono);color:var(--magenta)}
+.slot.locked .name{color:var(--tx-3)}
+.slot .desc{font:400 10px var(--mono);color:var(--tx-2);margin-top:4px;line-height:1.4}
+.slot .meta{font:400 9px var(--mono);color:var(--tx-3);margin-top:6px;
+  border-top:1px dotted var(--border);padding-top:4px}
+.slot.learned .meta{color:var(--teal)}
+
+.banner{
+  background:var(--bg-2);
+  border-left:3px solid var(--magenta);padding:8px 12px;
+  font:600 12px var(--mono);color:var(--magenta);
+  margin-bottom:14px;border-radius:0 4px 4px 0;
+  animation:slideIn 0.6s ease-out;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.banner .sub{display:block;font:400 10px var(--mono);color:var(--tx-2);
+  margin-top:2px}
+
+.legend{display:flex;justify-content:center;gap:18px;
+  font:400 10px var(--mono);color:var(--tx-3);margin-top:14px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;
+  margin-right:6px;vertical-align:-1px}
+.dot.t{background:var(--teal)}
+.dot.m{background:var(--magenta)}
+.dot.l{background:var(--tx-3)}
+</style>
+</head>
+<body>
+
+<h1>SPARK <small>* primitive library / "TM bag" UI mockup</small></h1>
+<p class="tagline">
+  Standalone preview of the in-app Pokemon-style primitive menu. The live
+  version is wired to <code>/api/bimanual/primitives</code> and rendered
+  by <code>showPrimitives()</code> in <code>index.html</code>.
+</p>
+
+<div class="bag">
+
+  <div class="bag-h">
+    TM BAG
+    <small>* 7 / 12 PRIMITIVES IN LIBRARY * TOOL USE I</small>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">CORE</div>
+    <div class="tab">TOOL USE</div>
+    <div class="tab">BIMANUAL</div>
+    <div class="tab">DYNAMIC</div>
+  </div>
+
+  <div class="banner">
+    NEW IN LIBRARY: PEN_WRITE !
+    <span class="sub">Pen-trace skill entry: force-tracked Z path on a page</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- Learned core primitives -->
+    <div class="slot learned"><div class="num">TM01</div>
+      <span class="glyph">&#x270B;</span><div class="name">GRASP_SE3</div>
+      <div class="desc">6-DoF approach + close on labeled keypoint</div>
+      <div class="meta">&#9733; 240 / 248 successes</div></div>
+
+    <div class="slot learned"><div class="num">TM02</div>
+      <span class="glyph">&#x21A9;</span><div class="name">RELEASE</div>
+      <div class="desc">Open gripper + 5 cm retract</div>
+      <div class="meta">&#9733; 248 / 248 successes</div></div>
+
+    <div class="slot learned"><div class="num">TM03</div>
+      <span class="glyph">&#x27A1;</span><div class="name">MOVE_TO_KEYPOINT</div>
+      <div class="desc">Travel to labeled keypoint with XYZ offset</div>
+      <div class="meta">&#9733; 612 / 619 successes</div></div>
+
+    <!-- Tool-use primitives -->
+    <div class="slot learned"><div class="num">TM21</div>
+      <span class="glyph">&#x1F9FD;</span><div class="name">SPONGE_WASH</div>
+      <div class="desc">Pick sponge, align, scrub, rinse, single-arm dish</div>
+      <div class="meta">&#9733; 14 / 18 successes</div></div>
+
+    <div class="slot learned"><div class="num">TM22</div>
+      <span class="glyph">&#x1F300;</span><div class="name">CONSTRAINED_SCRUB</div>
+      <div class="desc">Normal force + tangent oscillation under contact</div>
+      <div class="meta">&#9733; 22 / 27 successes</div></div>
+
+    <div class="slot newly-learned"><div class="num">TM23</div>
+      <span class="glyph">&#x1F58A;</span><div class="name">PEN_WRITE</div>
+      <div class="desc">Trace path on page, force-tracked Z, lift on done</div>
+      <div class="meta">&#9733; 1 / 1 success &nbsp; * &nbsp; NEW!</div></div>
+
+    <!-- Bimanual -->
+    <div class="slot learned"><div class="num">TM41</div>
+      <span class="glyph">&#x1F932;</span><div class="name">HANDOFF</div>
+      <div class="desc">Pass held object between arms at meeting point</div>
+      <div class="meta">&#9733; 9 / 12 successes</div></div>
+
+    <div class="slot locked"><div class="num">TM42</div>
+      <span class="glyph">&#x270C;</span><div class="name">BIMANUAL_LIFT</div>
+      <div class="desc">Both arms grasp opposite sides + coordinated lift</div>
+      <div class="meta">NOT IN LIBRARY</div></div>
+
+    <div class="slot locked"><div class="num">TM43</div>
+      <span class="glyph">&#x1F9FA;</span><div class="name">BIMANUAL_FOLD</div>
+      <div class="desc">Bifold-style cloth midline fold (requires Fabrica IK)</div>
+      <div class="meta">NOT IN LIBRARY</div></div>
+
+    <!-- Dynamic -->
+    <div class="slot locked"><div class="num">TM61</div>
+      <span class="glyph">&#x26BE;</span><div class="name">THROW_TO</div>
+      <div class="desc">Ballistic toss into labeled container</div>
+      <div class="meta">NOT IN LIBRARY</div></div>
+
+    <div class="slot locked"><div class="num">TM62</div>
+      <span class="glyph">&#x1F529;</span><div class="name">SCREW</div>
+      <div class="desc">Pure J5 rotation under torque cap</div>
+      <div class="meta">NOT IN LIBRARY</div></div>
+
+    <div class="slot locked"><div class="num">TM63</div>
+      <span class="glyph">&#x1F9F2;</span><div class="name">INSERT_COMPLIANT</div>
+      <div class="desc">Wiggle-on-contact peg-in-hole</div>
+      <div class="meta">NOT IN LIBRARY</div></div>
+
+  </div>
+
+  <div class="legend">
+    <span><span class="dot t"></span>In library</span>
+    <span><span class="dot m"></span>Newly added</span>
+    <span><span class="dot l"></span>Locked / not yet added</span>
+  </div>
+
+</div>
+
+</body>
+</html>

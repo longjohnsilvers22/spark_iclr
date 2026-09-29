@@ -1,0 +1,23 @@
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params: {keypoint_label: "plastic cup", offset_z: 0.10}
+    - type: tilt_wrist
+      params: {axis: "y", angle_rad: 1.047}
+    - type: move_relative
+      params: {dz: -0.07}
+    - type: grasp
+      params: {force: 50, target_width: 0.055}
+    - type: move_relative
+      params: {dz: 0.15}
+    - type: move_to_keypoint
+      params: {keypoint_label: "bowl", offset_z: 0.10}
+    - type: tilt_wrist
+      params: {axis: "y", angle_rad: -1.4}
+    - type: wait
+      params: {duration: 2.0}
+    - type: tilt_wrist
+      params: {axis: "y", angle_rad: 1.4}
+    - type: release
+      params: {}

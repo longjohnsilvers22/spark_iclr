@@ -1,0 +1,135 @@
+<mujoco model="corl_ur10e_silverware">
+  <!--
+    CoRL: silverware sort task with UR10e + Robotiq 2F-85.
+    Adapted from corl_f2_silverware.xml (Panda version).
+
+      - UR10e base at (-0.6, 0, 0.225), rotated 90deg to face +X.
+      - Table in front of robot (top at z=0.225).
+      - Knife: elongated thin block (160mm x 18mm x 30mm) on +Y side.
+      - Tray: shallow rectangular bin with 3 slots, on -Y side of table.
+      - Cameras: agentview, sideview, topview.
+
+    Trajectory:
+      Phase 1 (top-down hover above knife): joint move
+      Phase 2 (descend with OBB yaw, close gripper): joint move + ramp
+      Phase 3 (lift to safe Z): joint move
+      Phase 4 (transit to over slot): joint move
+      Phase 5 (descend into slot): joint move
+      Phase 6 (release gripper): smooth ramp
+      Phase 7 (retreat above slot): joint move
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/universal_robots_ur10e/assets"/>
+
+  <include file="_ur10e_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0 0 0.5" extent="1.5"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="knife_mat" rgba="0.85 0.85 0.85 1"
+              specular="0.9" shininess="0.9" reflectance="0.5"/>
+    <material name="tray_mat" rgba="0.35 0.25 0.18 1" reflectance="0.2" shininess="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: top surface at z=0.225 to match UR10e base height -->
+    <body name="table" pos="0.1 0 0.215">
+      <geom name="table_top" type="box" size="0.45 0.40 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Knife: 160mm x 18mm x 30mm thin block. On +Y side, oriented along Y
+      (long axis along Y). Bottom on table top (z=0.225).
+      Centre Z = 0.225 + 0.015 = 0.240.
+    -->
+    <body name="knife" pos="0.10 0.18 0.240">
+      <freejoint name="knife_free"/>
+      <geom name="knife_geom" type="box" size="0.009 0.080 0.015"
+            material="knife_mat"
+            condim="6" friction="3 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0" mass="0.10"
+                diaginertia="0.0002 0.00006 0.0002"/>
+    </body>
+
+    <!--
+      Tray: rectangular bin on -Y side. 3 slots.
+      Tray outer footprint: 230mm x 200mm x 35mm tall.
+      Placement: x=0.10, y=-0.18, bottom on table (z=0.225).
+    -->
+    <body name="tray" pos="0.10 -0.18 0.225">
+      <geom name="tray_base" type="box" size="0.115 0.10 0.005"
+            pos="0 0 0.005" material="tray_mat"/>
+      <!-- Outer walls -->
+      <geom name="tray_wall_n" type="box" size="0.115 0.005 0.020"
+            pos="0 0.095 0.025" material="tray_mat"/>
+      <geom name="tray_wall_s" type="box" size="0.115 0.005 0.020"
+            pos="0 -0.095 0.025" material="tray_mat"/>
+      <geom name="tray_wall_e" type="box" size="0.005 0.10 0.020"
+            pos="0.11 0 0.025" material="tray_mat"/>
+      <geom name="tray_wall_w" type="box" size="0.005 0.10 0.020"
+            pos="-0.11 0 0.025" material="tray_mat"/>
+      <!-- 2 dividers along Y (split tray into 3 X-slots) -->
+      <geom name="tray_div_1" type="box" size="0.003 0.095 0.020"
+            pos="-0.037 0 0.025" material="tray_mat"/>
+      <geom name="tray_div_2" type="box" size="0.003 0.095 0.020"
+            pos="0.037 0 0.025" material="tray_mat"/>
+      <site name="slot0" pos="-0.075 0 0.015" size="0.025 0.085 0.001"
+            rgba="0 1 0 0.2" type="box"/>
+      <site name="slot1" pos="0 0 0.015" size="0.025 0.085 0.001"
+            rgba="0 1 0 0.2" type="box"/>
+      <site name="slot2" pos="0.075 0 0.015" size="0.025 0.085 0.001"
+            rgba="0 1 0 0.2" type="box"/>
+    </body>
+
+    <!-- ================================================================
+         CAMERAS
+         ================================================================ -->
+    <body name="cam_target" pos="0.1 0 0.25">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.2 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.1 -1.2 0.6">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.1 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <!-- UR10e home: 6 arm + 8 gripper + knife (7 free) = 21 qpos -->
+  <keyframe>
+    <key name="home"
+         qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0 0 0 0 0 0 0 0 0
+                0.10 0.18 0.240 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0 0"/>
+  </keyframe>
+</mujoco>

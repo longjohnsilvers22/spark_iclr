@@ -1,0 +1,230 @@
+<mujoco model="corl_dustpan_ur10e">
+  <!--
+    CoRL: dustpan sweep task with UR10e + Robotiq 2F-85.
+      - UR10e base at (-0.6, 0, 0.225), rotated 90deg to face +X.
+      - Table in front of robot (top at z=0.225).
+      - Brush: elongated cylinder lying flat on table.
+      - Dustpan: open-top wedge/tray near table edge.
+      - Debris: small cubes scattered between brush and dustpan.
+      - Cameras: agentview, sideview, topview.
+
+    Task:
+      1. Grasp brush (top-down)
+      2. Transport brush behind debris
+      3. Sweep forward into dustpan
+      4. Retreat
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/universal_robots_ur10e/assets"/>
+
+  <include file="_ur10e_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0 0 0.5" extent="1.5"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35"
+             width="512" height="512" mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+    <material name="table_mat" rgba="0.7 0.5 0.3 1"
+              reflectance="0.4" shininess="0.3"/>
+
+    <!-- Brush materials -->
+    <material name="brush_handle_mat" rgba="0.55 0.35 0.15 1"
+              reflectance="0.2" shininess="0.3"/>
+    <material name="brush_bristles_mat" rgba="0.85 0.80 0.50 1"
+              reflectance="0.05" shininess="0.05"/>
+
+    <!-- Dustpan material -->
+    <material name="dustpan_mat" rgba="0.2 0.2 0.25 1"
+              reflectance="0.3" shininess="0.4"/>
+
+    <!-- Debris material -->
+    <material name="debris_mat" rgba="0.9 0.3 0.2 1"
+              reflectance="0.1" shininess="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: top surface at z=0.225 to match UR10e base height -->
+    <body name="table" pos="0.1 0 0.215">
+      <geom name="table_top" type="box" size="0.45 0.40 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1.5 0.8 0.001"/>
+    </body>
+
+    <!-- ================================================================
+         TASK OBJECTS: dustpan, brush, debris
+         ================================================================ -->
+
+    <!--
+      Brush: handle (cylinder 160mm x 20mm dia) + bristle pad (box 60mm x 40mm x 15mm).
+      Lying flat on table, handle along Y axis, at x=0.15, y=0.20.
+      Handle centre at z=0.235 (table top 0.225 + half handle dia 0.010).
+    -->
+    <body name="brush" pos="0.05 0.20 0.236">
+      <freejoint name="brush_free"/>
+      <inertial pos="0 0 0" mass="0.10"
+                diaginertia="0.00015 0.00002 0.00015"/>
+      <!-- Handle: box along Y. Width 30mm gives firm Robotiq pad
+           contact. The pad_box1/pad_box2 geoms are 9.375mm tall each,
+           so a 30mm wide handle ensures full pad wrap. -->
+      <geom name="brush_handle" type="box" size="0.015 0.070 0.012"
+            pos="0 0 0"
+            material="brush_handle_mat"
+            condim="6" friction="3.0 1.5 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"
+            priority="1"/>
+      <!-- Bristle pad: LARGE box extending below the handle at one end.
+           120x60x12mm -- clearly visible as the sweeping surface.
+           Friction high enough to push debris. -->
+      <geom name="brush_bristles" type="box" size="0.060 0.030 0.008"
+            pos="0 0.065 -0.012"
+            material="brush_bristles_mat"
+            condim="6" friction="1.5 0.8 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Bristle fringe: dark visual at bottom of bristle pad -->
+      <geom name="brush_fringe" type="box" size="0.058 0.028 0.003"
+            pos="0 0.065 -0.017"
+            rgba="0.65 0.55 0.30 1"
+            condim="6" friction="1.5 0.8 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+    </body>
+
+    <!--
+      Dustpan: open-top container at table edge, facing toward the debris area.
+      The "opening" faces toward +X (toward the debris/brush).
+      Position: x=0.35, y=0.0 (center of table, far side from robot).
+      Pan floor at table surface z=0.225.
+    -->
+    <body name="dustpan" pos="0.28 0.0 0.225">
+      <!-- Pan floor -->
+      <geom name="dustpan_floor" type="box" size="0.08 0.07 0.002"
+            pos="0 0 0.002" material="dustpan_mat"
+            friction="1.5 0.5 0.001"/>
+      <!-- Back wall (far from opening, at -X side) -->
+      <geom name="dustpan_back" type="box" size="0.003 0.07 0.020"
+            pos="-0.077 0 0.022" material="dustpan_mat"/>
+      <!-- Side walls -->
+      <geom name="dustpan_left" type="box" size="0.08 0.003 0.020"
+            pos="0 0.067 0.022" material="dustpan_mat"/>
+      <geom name="dustpan_right" type="box" size="0.08 0.003 0.020"
+            pos="0 -0.067 0.022" material="dustpan_mat"/>
+      <!-- Front lip (low, just 5mm, so debris can slide in) -->
+      <geom name="dustpan_lip" type="box" size="0.003 0.07 0.003"
+            pos="0.077 0 0.005" material="dustpan_mat"/>
+      <!-- Handle stub at the back -->
+      <geom name="dustpan_handle" type="cylinder" size="0.008 0.06"
+            pos="-0.090 0 0.040" quat="0.707107 0 0.707107 0"
+            material="dustpan_mat" contype="0" conaffinity="0"/>
+      <!-- Target site for measuring debris arrival -->
+      <site name="dustpan_center" pos="0 0 0.010" size="0.05 0.05 0.001"
+            rgba="0 1 0 0.15" type="box"/>
+    </body>
+
+    <!--
+      Debris: 6 small cubes scattered between the brush and dustpan.
+      Each is a 10mm cube with freejoint, placed on the table surface.
+      Spread around x=0.20..0.30, y=-0.08..0.08.
+    -->
+    <body name="debris_1" pos="0.10 0.03 0.232">
+      <freejoint name="debris_1_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_1_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <body name="debris_2" pos="0.12 -0.02 0.232">
+      <freejoint name="debris_2_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_2_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <body name="debris_3" pos="0.15 0.01 0.232">
+      <freejoint name="debris_3_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_3_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <body name="debris_4" pos="0.14 -0.04 0.232">
+      <freejoint name="debris_4_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_4_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <body name="debris_5" pos="0.17 0.04 0.232">
+      <freejoint name="debris_5_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_5_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <body name="debris_6" pos="0.13 0.05 0.232">
+      <freejoint name="debris_6_free"/>
+      <inertial pos="0 0 0" mass="0.003" diaginertia="5e-8 5e-8 5e-8"/>
+      <geom name="debris_6_geom" type="box" size="0.005 0.005 0.005"
+            material="debris_mat" condim="6"
+            friction="0.5 0.2 0.001" solref="0.02 1"
+            solimp="0.9 0.95 0.005"/>
+    </body>
+
+    <!-- ================================================================
+         CAMERAS
+         ================================================================ -->
+    <body name="cam_target" pos="0.2 0 0.25">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.2 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.2 -1.2 0.6">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.2 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <key name="home"
+         qpos="0 -1.5708 1.5708 -1.5708 -1.5708 0 0 0 0 0 0 0 0 0
+                0.05 0.20 0.236 1 0 0 0
+                0.10 0.03 0.232 1 0 0 0
+                0.12 -0.02 0.232 1 0 0 0
+                0.15 0.01 0.232 1 0 0 0
+                0.14 -0.04 0.232 1 0 0 0
+                0.17 0.04 0.232 1 0 0 0
+                0.13 0.05 0.232 1 0 0 0"
+         ctrl="0 -1.5708 1.5708 -1.5708 -1.5708 0 0"/>
+  </keyframe>
+</mujoco>

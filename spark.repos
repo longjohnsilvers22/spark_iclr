@@ -1,0 +1,65 @@
+# SPARK simulation assets (fetched at setup; not committed to the repo)
+# Public mesh/asset repositories used by the sim and benchmark paths.
+#
+# Usage:
+#   cd ~/spark/src
+#   vcs import < ../spark.repos
+#
+# Install vcs tool if not available:
+#   pip install vcstool
+
+repositories:
+  # MuJoCo Menagerie - Robot models for simulation
+  mujoco_menagerie:
+    type: git
+    url: https://github.com/google-deepmind/mujoco_menagerie.git
+    version: main
+
+  # PartNeXt - Dataset toolkit for procedural scene generation
+  PartNeXt:
+    type: git
+    url: https://github.com/AuthorityWang/PartNeXt.git
+    version: main
+
+  # Robosuite - MuJoCo-based manipulation environments and assets
+  robosuite:
+    type: git
+    url: https://github.com/ARISE-Initiative/robosuite.git
+    version: master
+
+  # Object Sim - 60+ everyday object models for manipulation
+  object_sim:
+    type: git
+    url: https://github.com/vikashplus/object_sim.git
+    version: main
+
+  # Furniture Sim - Actuated furniture (cabinets, drawers, appliances)
+  furniture_sim:
+    type: git
+    url: https://github.com/vikashplus/furniture_sim.git
+    version: master
+
+  # GraspGen - Diffusion-based 6-DOF grasp generation (NVIDIA)
+  graspgen:
+    type: git
+    url: https://github.com/NVlabs/GraspGen.git
+    version: main
+
+  # LIBERO-PRO - perturbed LIBERO benchmark; spark_bench imports it as
+  # `libero.libero` with PYTHONPATH=src/libero_pro:src (fair/config.py)
+  libero_pro:
+    type: git
+    url: https://github.com/Zxy-MLlab/LIBERO-PRO.git
+    version: main
+
+  # CaP-X baseline (cap_gym) - only for the CaP-Bench comparison
+  cap_gym:
+    type: git
+    url: https://github.com/capgym/cap-x.git
+    version: main
+
+  # SAM3 - Segment Anything Model 3 for open-vocabulary segmentation
+  sam3:
+    type: git
+    url: https://github.com/facebookresearch/sam3.git
+    version: main

@@ -1,0 +1,53 @@
+# Task 8 of the demo set: "pick up the silverware".
+#
+# NOTE: /data/teleop_episodes/"pick up the silverware" is an EMPTY
+# directory -- there are zero human episodes for this task. Recording SPARK
+# data for it only makes sense if matching human data is collected too;
+# otherwise the comparison has 7 tasks, not 8.
+instruction: "pick up the silverware"
+aliases:
+  - "pick up all the silverware and place it in the tray"
+  - "pick up the silverware and place it in the tray"
+  - "put the silverware in the tray"
+  - "pick up the utensils and place them in the tray"
+  - "put the utensils in the tray"
+objects: ["silverware 1", "silverware 2", "tray"]
+priority: 10
+promote: true
+verified: true
+provenance: >-
+  Captured verbatim from live-run library entry f1475b966209
+  ("pick up all the silverware and place it in the tray", success=1
+  fail=0), the two-item variant. The three-item variant e91b06c1c664
+  (success=2 fail=0) is the same tree with a third pick and slot_idx 2;
+  see the note below on which to use.
+notes: >-
+  This tree is staged for TWO utensils. A scene with three needs the
+  three-item variant, and a scene with one leaves the second pick to fail
+  the sequence. That arity coupling is the reason this task is the least
+  cache-friendly of the eight: the tree encodes the item count, not just
+  the recipe. Either stage exactly two utensils every episode, or run with
+  max_task_passes >= 2 and a single-pick tree so the closed loop handles
+  whatever is left. Slot indices differ per item so the utensils do not
+  land on top of one another.
+score:
+  task: "pick up the silverware"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "silverware 1", offset_z: 0.0}
+      - type: grasp
+        params: {force: 50, target_width: 0.01}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: place_in_slot
+        params: {container_label: "tray", slot_idx: 1}
+      - type: move_to_keypoint
+        params: {keypoint_label: "silverware 2", offset_z: 0.0}
+      - type: grasp
+        params: {force: 50, target_width: 0.01}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: place_in_slot
+        params: {container_label: "tray", slot_idx: 2}

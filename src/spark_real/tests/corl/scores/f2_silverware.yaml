@@ -1,0 +1,26 @@
+# CoRL F2: silverware sort.
+# Pre-baked BT score dispatched through the production skill registry.
+# Exercises:
+#   - grasp_se3 (strategy=top_down) - production top-down grasp
+#   - place_in_slot                  - production slotted-place
+#   - release                        - production release
+#
+# The knife's OBB major axis is along world Y in the scene XML; the
+# detection_map override in the test driver supplies orientation_angle
+# = pi/2 so _grasp_top_down's yaw alignment yields jaws closing along
+# world X (perpendicular to the knife body).
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "knife handle"
+        strategy: top_down
+        force: 80
+        target_width: 0.012
+    - type: place_in_slot
+      params:
+        container_label: tray
+        slot_idx: 0
+        release_height_m: 0.05
+        hover_clearance_m: 0.10

@@ -1,0 +1,49 @@
+```yaml
+task: "put the knife in the tray"
+__fcot:
+  - "the knife lies handle-left, blade-right; grip the handle"
+  - "the tray's right half holds a spoon already, so place left"
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "knife handle 1"
+        offset_z: 0
+      __robointer:
+        subtask: "reach the knife's handle, not its blade"
+        primitive_skill: pick
+        label: "knife handle 1"
+        camera: sideview
+        object_box: [[380, 470], [700, 545]]
+        contact_point: [425, 508]
+        affordance_box: [[395, 480], [455, 536]]
+    - type: grasp
+      params:
+        force: 60
+        target_width: 0.01
+        grasp_strategy: "obb"
+        grasp_yaw_deg: 12.0
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.2}
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "tray"
+        offset_z: 0.1
+      __robointer:
+        subtask: "release over the empty left half of the tray"
+        primitive_skill: place
+        label: "tray"
+        camera: sideview
+        placement_proposal: [[120, 300], [300, 430]]
+        trace: [[425, 508], [380, 420], [260, 366]]
+    - type: release
+verify:
+  all:
+    - pred: inside
+      obj: "knife handle 1"
+      container: "tray"
+    - pred: held
+      obj: "knife handle 1"
+      value: false
+```

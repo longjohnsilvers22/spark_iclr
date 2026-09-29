@@ -1,0 +1,30 @@
+# Pour task -- UR10e + Robotiq 2F-85
+# Grasp the cup and pour into the bowl.
+# Uses legacy UR10e primitives (move_to_keypoint + grasp).
+task: pour the cup into the bowl
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "cup"
+        offset_z: 0.10
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "cup"
+        offset_z: 0.0
+    - type: grasp
+      params:
+        force: 80
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.12}
+    - type: pour
+      params:
+        source_label: "cup"
+        target_label: "bowl"
+        pour_angle_rad: 1.2
+        max_pour_s: 4.0
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}
+    - type: release
+      params: {}

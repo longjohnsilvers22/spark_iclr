@@ -1,0 +1,18 @@
+# Dustpan sweep task -- production skill_registry dispatch.
+# Uses grasp_se3 (top-down brush pick) + sweep_to_container
+# (iterative perception-guided sweep). NO hardcoded waypoints.
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "brush"
+        strategy: "top_down"
+        target_width: 0.025
+        force: 60
+    - type: sweep_to_container
+      params:
+        container_label: "dustpan"
+        clutter_label: "debris"
+        max_passes: 4
+        sweep_height: 0.005

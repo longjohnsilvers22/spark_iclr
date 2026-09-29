@@ -1,0 +1,9 @@
+# Disable USB autosuspend for Azure Kinect (vendor 045e). Autosuspend on an
+# active isochronous depth stream under xhci can trigger event-cascade errors
+# and silent CPU lockups, so pin power/control to on.
+# Product IDs: 097a SS hub, 097b HS hub, 097c depth, 097d 4K color, 097e mic.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="045e", ATTR{idProduct}=="097a", TEST=="power/control", ATTR{power/control}="on"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="045e", ATTR{idProduct}=="097b", TEST=="power/control", ATTR{power/control}="on"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="045e", ATTR{idProduct}=="097c", TEST=="power/control", ATTR{power/control}="on"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="045e", ATTR{idProduct}=="097d", TEST=="power/control", ATTR{power/control}="on"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="045e", ATTR{idProduct}=="097e", TEST=="power/control", ATTR{power/control}="on"

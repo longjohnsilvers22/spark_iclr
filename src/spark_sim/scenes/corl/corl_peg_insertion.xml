@@ -1,0 +1,167 @@
+<mujoco model="corl_peg_insertion">
+  <!--
+    CoRL peg insertion task.
+      - Panda arm at world origin.
+      - Peg: silver cylinder (r=4mm, h=60mm) lying FLAT on table.
+      - Block: dark box (60x60x30mm) with a tight hole (r=4.5mm, depth=25mm).
+        Hole is created by 4 box walls arranged around a central gap.
+      - Cameras: agentview, sideview, topview.
+
+    Task sequence:
+      1. Top-down grasp peg lying flat (across short axis).
+      2. Roll wrist 90 deg so peg points vertical (down).
+      3. Transport to above hole.
+      4. Descend + wiggle/spiral search for insertion.
+      5. Insert fully.
+      6. Release.
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <option integrator="implicitfast"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.4 0 0.3" extent="1.0"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="peg_mat" rgba="0.80 0.82 0.85 1"
+              specular="0.9" shininess="0.95" reflectance="0.6"/>
+    <material name="block_mat" rgba="0.25 0.25 0.30 1"
+              specular="0.3" shininess="0.15" reflectance="0.1"/>
+    <material name="hole_inner_mat" rgba="0.15 0.15 0.18 1"
+              specular="0.2" shininess="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table -->
+    <body name="table" pos="0.50 0 -0.01">
+      <geom name="table_top" type="box" size="0.40 0.35 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Peg: cylinder r=4mm, full height=60mm, lying FLAT on the table.
+      Lying flat means the cylinder's long axis is along world Y.
+      MuJoCo cylinder default: axis along Z. To lay flat along Y, rotate
+      90 degrees about X.
+      Centre at table surface: z = r = 0.004.
+      Pos: (0.45, 0.20, 0.004) — right side of table.
+    -->
+    <body name="peg" pos="0.45 0.20 0.004" euler="1.5708 0 0">
+      <freejoint name="peg_free"/>
+      <geom name="peg_geom" type="cylinder" size="0.004 0.030"
+            material="peg_mat"
+            condim="6" friction="2 1 0.002"
+            solimp="0.9 0.95 0.005" solref="0.02 1"
+            mass="0.025"/>
+      <inertial pos="0 0 0" mass="0.025"
+                diaginertia="0.000005 0.000005 0.000001"/>
+    </body>
+
+    <!--
+      Block with hole: 60x60x30mm block. The hole (clearance ~2mm per side
+      around the 8mm-dia peg) runs through the top centre.
+
+      Strategy: build the block from 4 wall segments around a central
+      square gap, plus a floor at the bottom of the hole.
+
+      Block centre at (0.45, -0.15, 0.015) -- on the -Y side of table.
+      Block bottom on table (z=0), top at z=0.030.
+
+      Gap half-size: 0.006 (12mm square gap for 8mm peg = 2mm clearance/side).
+      Hole depth = 25mm (floor at z=0.005, block top at z=0.030).
+
+      Wall layout (half-sizes in block-local frame):
+        Full block half-sizes: 0.030 x 0.030 x 0.015
+        Gap half-size: 0.006 x 0.006
+        Wall N: y=[0.006, 0.030] => half_y=0.012  pos_y=0.018
+        Wall S: y=[-0.030, -0.006] => half_y=0.012  pos_y=-0.018
+        Wall E: x=[0.006, 0.030], y=[-0.006, 0.006] => half_x=0.012 half_y=0.006  pos_x=0.018
+        Wall W: x=[-0.030, -0.006], y=[-0.006, 0.006] => half_x=0.012 half_y=0.006  pos_x=-0.018
+        Floor:  z=[0, 0.005] => half_z=0.0025  pos_z=0.0025
+    -->
+    <body name="block" pos="0.45 -0.15 0.0">
+      <!-- North wall (Y+) -->
+      <geom name="block_wall_n" type="box"
+            size="0.030 0.012 0.015" pos="0 0.018 0.015"
+            material="block_mat"
+            friction="1 0.5 0.001"/>
+      <!-- South wall (Y-) -->
+      <geom name="block_wall_s" type="box"
+            size="0.030 0.012 0.015" pos="0 -0.018 0.015"
+            material="block_mat"
+            friction="1 0.5 0.001"/>
+      <!-- East wall (X+) -->
+      <geom name="block_wall_e" type="box"
+            size="0.012 0.006 0.015" pos="0.018 0 0.015"
+            material="block_mat"
+            friction="1 0.5 0.001"/>
+      <!-- West wall (X-) -->
+      <geom name="block_wall_w" type="box"
+            size="0.012 0.006 0.015" pos="-0.018 0 0.015"
+            material="block_mat"
+            friction="1 0.5 0.001"/>
+      <!-- Hole floor: 5mm from block bottom = hole depth 25mm -->
+      <geom name="hole_floor" type="box"
+            size="0.006 0.006 0.0025" pos="0 0 0.0025"
+            material="hole_inner_mat"
+            friction="0.5 0.3 0.001"/>
+
+      <!-- Visual site marking the hole centre at the block top -->
+      <site name="hole_centre" pos="0 0 0.030" size="0.005"
+            rgba="1 0 0 0.4" type="sphere"/>
+    </body>
+
+    <!-- Camera bodies -->
+    <body name="cam_target" pos="0.45 0 0.05">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.4 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.50 -1.0 0.45">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.45 0 1.3">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <keyframe>
+    <!--
+      qpos: 7 arm joints + 2 finger joints + peg freejoint (7: pos3 + quat4)
+      Peg lying flat at (0.45, 0.20, 0.004), rotated 90 deg about X:
+        quat wxyz for euler(pi/2, 0, 0) = (cos(pi/4), sin(pi/4), 0, 0) = (0.7071, 0.7071, 0, 0)
+    -->
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785  0.04 0.04
+               0.45 0.20 0.004 0.7071068 0.7071068 0 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785  255"/>
+  </keyframe>
+</mujoco>

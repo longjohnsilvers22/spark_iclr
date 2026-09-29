@@ -1,0 +1,125 @@
+# ANON-LAB bimanual rig machine overlay, SCRUBBED TEMPLATE.
+# Copy to configs/machines/ANON-LAB.yaml (gitignored) and fill in the real
+# values. load_family_yaml deep-merges it over bimanual_franka_default.yaml
+# when the server is launched with `--robot bimanual_franka --machine ANON-LAB`;
+# src/scripts/{sort_silverware,fold_tshirt_v3,recover_fold,stage_home,
+# set_payload}.py and scripts/teleop.py read the same overlay.
+#
+# Only keys that differ from the family default appear here. MEASURE BEFORE
+# USE: robot.base_left/base_right, robot.home_config_*, workspace_left/right
+# and inter_arm are inherited from bimanual_franka_default.yaml as
+# placeholders, not the ANON-LAB table mounting; coordinated motion with wrong
+# base offsets drives the arms into each other. Override them here once
+# measured.
+#
+# Rig: Franka Emika Panda (left) + Franka FR3 (right), Source Robotics SSG-48
+# parallel jaws on two slcan buses, one static ZED Mini plus one UVC webcam
+# per gripper, bamboo joint-impedance backend.
+#
+# Placeholders: IPs are RFC 5737 documentation addresses, camera serials and
+# v4l device paths are empty. Nothing in this file identifies a real host.
+
+robot:
+  variant: "ANON-LAB"
+  left_ip:  "192.0.2.1"    # PLACEHOLDER: Panda (left / non-dominant)
+  right_ip: "192.0.2.2"    # PLACEHOLDER: FR3 (right / dominant)
+
+  # Arm-motion backend for the bimanual driver:
+  #   "bamboo" = the validated C++ joint-impedance controller
+  #              (external_controllers/bamboo, one node per arm on ZMQ
+  #              ports 5555/5556, accel-limited durations).
+  #   "franky" = libfranka motion generators (unvalidated on this rig).
+  # Each per-arm FrankaBambooDriver spawns its own bamboo_control_node.
+  # Realtime joint servo is unsupported under bamboo.
+  backend: "bamboo"
+
+  urdf:
+    # Left arm is a Panda (FER), right arm is FR3; keep distinct URDFs so
+    # perception TF does not treat the left arm as an FR3.
+    left_path:  "robots/franka/urdf/panda_franka_hand.urdf"
+
+# Source Robotics SSG-48 parallel grippers, one per arm, each on its own
+# slcan CAN bus.
+grippers:
+  # SSG-48 payload registered with libfranka by src/scripts/set_payload.py
+  # so idle gravity compensation carries the gripper (estimate; re-weigh).
+  payload:
+    mass_kg: 0.7
+    com_m: [0.0, 0.0, 0.08]
+  type: "ssg48"
+  bustype: "slcan"
+  bitrate: 1000000
+  node_id: 0
+  position_deadband: 5
+  max_force_ma: 1300
+  # Physically reachable stroke with the installed jaws; re-measure with
+  # calipers when the jaws change.
+  width_open_m: 0.090
+  width_closed_m: 0.000
+  # Jaw-tip offset along the flange +Z axis (flange pose -> closed jaw tip).
+  # The same value is grip_offset_m in ~/.spark_real/calibration_bimanual.json
+  # (written by spark_real.calibration.bimanual_anchor_tap); keep in sync.
+  jaw_offset_m: 0.1275
+
+  # Channel <-> arm mapping. Verify by pressing Open on the LEFT card and
+  # watching which gripper moves; swap the two channels if wrong.
+  left:
+    channel: "/dev/ttyACM0"
+    auto_calibrate: true
+    default_speed: 100
+    default_force_ma: 800     # ~40 N; max_force_ma 1300 (~60 N) is the ceiling
+  right:
+    channel: "/dev/ttyACM1"
+    auto_calibrate: true
+    default_speed: 75
+    default_force_ma: 800
+
+# Cameras: one static ZED Mini (external world view) and two UVC webcams,
+# one per gripper. Identical webcams often share one USB serial, so bind
+# them by /dev/v4l/by-path/... (hub port) rather than by-id. Verify the
+# left/right assignment by capturing a frame from each.
+cameras:
+  - role: "external"
+    type: "zed_mini"
+    serial: ""              # empty: SDK picks the only ZED on the bus
+    # Three USB cameras share one controller; HD720 plus two raw 640x480
+    # streams can saturate the bus (ZED "stream failed to start"). Drop
+    # to VGA if the ZED is not on a dedicated USB 3.x port.
+    width: 1280
+    height: 720
+    fps: 30
+    depth_mode: "NEURAL"
+    flip: "auto"            # "on" if the frontend shows the feed upside down
+  - role: "wrist_left"
+    type: "webcam"
+    arm: "left"
+    device: ""              # PLACEHOLDER: /dev/v4l/by-path/<left-hub-port>-video-index0
+    width: 640
+    height: 480
+    fps: 30
+    tool_offset_xyz: [0.00, 0.00, 0.00]   # identity until the bracket is calibrated
+  - role: "wrist_right"
+    type: "webcam"
+    arm: "right"
+    device: ""              # PLACEHOLDER: /dev/v4l/by-path/<right-hub-port>-video-index0
+    width: 640
+    height: 480
+    fps: 30
+    tool_offset_xyz: [0.00, 0.00, 0.00]
+
+collision_behavior:
+  # 25 N Cartesian threshold: the FR3's contact-force estimate spikes during
+  # autonomous descent and tripped cartesian_reflex at the family-default
+  # 10 N with no real contact.
+  joint_torque_nom_lower: [20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0]
+  joint_torque_nom_upper: [20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0]
+  cartesian_force_nom_lower: [25.0, 25.0, 25.0, 25.0, 25.0, 25.0]
+  cartesian_force_nom_upper: [25.0, 25.0, 25.0, 25.0, 25.0, 25.0]
+
+# Bimanual t-shirt fold tuning. The left jaw yaw carries +180 on top of the
+# 90 deg mount offset so the wrist camera faces backward like the FR3's.
+# Hem x offsets are on top of the detected mask corners.
+cloth:
+  hem_x_offset_right_m: 0.040
+  hem_x_offset_left_m: 0.040
+  left_jaw_yaw_flip_deg: 180

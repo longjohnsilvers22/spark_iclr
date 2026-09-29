@@ -1,0 +1,41 @@
+{
+  "type": "charuco",
+  "dictionary": "DICT_4X4_100",
+  "squares_x": 5,
+  "squares_y": 7,
+  "square_length_m": 0.03425,
+  "marker_length_m": 0.025116,
+  "marker_ids_used": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+  ],
+  "image_pixels": [
+    1958,
+    2666
+  ],
+  "image_dpi": 300,
+  "image_size_mm": [
+    187.9,
+    255.8
+  ],
+  "board_active_size_mm": [
+    170.0,
+    238.0
+  ],
+  "note": "physical print measured at 114.2% of design scale (137mm across 4 squares, re-measured 2026-06-04; square 34.25mm, marker scaled by the same ratio); lengths above are MEASURED physical sizes"
+}

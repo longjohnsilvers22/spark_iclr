@@ -1,0 +1,657 @@
+macros:
+- name: pick_and_place
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: black ceramic bowl
+      n_distinct: 31
+    node3.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: pick_and_place
+  support: 16
+  distinct_tasks: 16
+  bound_params:
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: black bowl
+      n_distinct: 9
+    node3.keypoint_label:
+      example: plate
+      n_distinct: 7
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+  - lift bowl from stove and set on plate
+  - lift chocolate pudding and put it in basket
+- name: pick_and_place
+  support: 14
+  distinct_tasks: 14
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: short cylinder
+      n_distinct: 12
+    node3.keypoint_label:
+      example: basket
+      n_distinct: 7
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - pick up the black bowl and place it on the plate
+  - pick up the bottle with green label and place it in the basket
+  - pick up the brown bottle with cap and place it in the basket
+- name: move_to_keypoint_then_grasp_then_move_relative_then_move_to_
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: black ceramic bowl
+      n_distinct: 31
+    node3.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_then_move_relative_then_move_to_keypoint_then_release
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+    node2.offset_z: 0.05
+  free_params:
+    node2.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node2.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_then_move_relative_then_move_to_keypoint_then_release
+  support: 30
+  distinct_tasks: 30
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+    node1.holding: true
+    node2.offset_z: 0.05
+  free_params:
+    node2.keypoint_label:
+      example: basket
+      n_distinct: 9
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node2.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+- name: move_to_keypoint_then_grasp_then_move_relative_then_move_to_
+  support: 16
+  distinct_tasks: 16
+  bound_params:
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: black bowl
+      n_distinct: 9
+    node3.keypoint_label:
+      example: plate
+      n_distinct: 7
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+  - lift bowl from stove and set on plate
+  - lift chocolate pudding and put it in basket
+- name: move_to_keypoint_then_grasp_then_move_relative_then_move_to_
+  support: 14
+  distinct_tasks: 14
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+    node3.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: short cylinder
+      n_distinct: 12
+    node3.keypoint_label:
+      example: basket
+      n_distinct: 7
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node3.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - pick up the black bowl and place it on the plate
+  - pick up the bottle with green label and place it in the basket
+  - pick up the brown bottle with cap and place it in the basket
+- name: pick_top_down
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+  free_params:
+    node0.keypoint_label:
+      example: black ceramic bowl
+      n_distinct: 31
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_then_move_relative_then_move_to_keypoint
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+    node2.offset_z: 0.05
+  free_params:
+    node2.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node2.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: lift_and_place
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.dz: 0.2
+    node1.offset_z: 0.05
+  free_params:
+    node1.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node1.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_then_move_relative_then_move_to_keypoint
+  support: 30
+  distinct_tasks: 30
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+    node1.holding: true
+    node2.offset_z: 0.05
+  free_params:
+    node2.keypoint_label:
+      example: basket
+      n_distinct: 9
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node2.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+- name: lift_and_place
+  support: 30
+  distinct_tasks: 30
+  bound_params:
+    node0.dz: 0.2
+    node0.holding: true
+    node1.offset_z: 0.05
+  free_params:
+    node1.keypoint_label:
+      example: basket
+      n_distinct: 9
+  body:
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node1.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+- name: pick_top_down
+  support: 16
+  distinct_tasks: 16
+  bound_params:
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+  free_params:
+    node0.keypoint_label:
+      example: black bowl
+      n_distinct: 9
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  example_tasks:
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+  - lift bowl from stove and set on plate
+  - lift chocolate pudding and put it in basket
+- name: pick_top_down
+  support: 14
+  distinct_tasks: 14
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+    node2.dz: 0.2
+    node2.holding: true
+  free_params:
+    node0.keypoint_label:
+      example: short cylinder
+      n_distinct: 12
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - pick up the black bowl and place it on the plate
+  - pick up the bottle with green label and place it in the basket
+  - pick up the brown bottle with cap and place it in the basket
+- name: place_at
+  support: 64
+  distinct_tasks: 64
+  bound_params:
+    node0.offset_z: 0.05
+  free_params:
+    node0.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 34
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0.05
+  - type: release
+    params: {}
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: approach_grasp
+  support: 48
+  distinct_tasks: 48
+  bound_params:
+    node0.offset_z: 0
+    node1.force: 100
+  free_params:
+    node0.keypoint_label:
+      example: black ceramic bowl
+      n_distinct: 42
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+      offset_z: 0
+  - type: grasp
+    params:
+      force: 100
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_and_lift
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+  free_params: {}
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: move_relative_then_move_to_keypoint
+  support: 34
+  distinct_tasks: 34
+  bound_params:
+    node0.dz: 0.2
+    node1.offset_z: 0.05
+  free_params:
+    node1.keypoint_label:
+      example: white ceramic plate
+      n_distinct: 28
+  body:
+  - type: move_relative
+    params:
+      dz: 0.2
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node1.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the akita black bowl between the plate and the ramekin and place it on the
+    plate
+  - Pick the akita black bowl from table center and place it on the plate
+  - Pick the akita black bowl next to the cookie box and place it on the plate
+  - Pick the akita black bowl next to the cookies box and place it on the plate
+  - Pick the akita black bowl next to the plate and place it on the plate
+- name: grasp_and_lift
+  support: 30
+  distinct_tasks: 30
+  bound_params:
+    node0.force: 100
+    node1.dz: 0.2
+    node1.holding: true
+  free_params: {}
+  body:
+  - type: grasp
+    params:
+      force: 100
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+- name: move_relative_then_move_to_keypoint
+  support: 30
+  distinct_tasks: 30
+  bound_params:
+    node0.dz: 0.2
+    node0.holding: true
+    node1.offset_z: 0.05
+  free_params:
+    node1.keypoint_label:
+      example: basket
+      n_distinct: 9
+  body:
+  - type: move_relative
+    params:
+      dz: 0.2
+      holding: true
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node1.keypoint_label>
+      offset_z: 0.05
+  example_tasks:
+  - Pick the butter and place it in the basket
+  - Pick the milk and place it in the basket
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+- name: approach_grasp
+  support: 16
+  distinct_tasks: 16
+  bound_params:
+    node1.force: 100
+  free_params:
+    node0.keypoint_label:
+      example: black bowl
+      n_distinct: 9
+  body:
+  - type: move_to_keypoint
+    params:
+      keypoint_label: <node0.keypoint_label>
+  - type: grasp
+    params:
+      force: 100
+  example_tasks:
+  - Put the plate on the stove
+  - grab cream cheese and put into basket
+  - lift bowl from cabinet and put on plate
+  - lift bowl from stove and set on plate
+  - lift chocolate pudding and put it in basket

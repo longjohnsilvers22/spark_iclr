@@ -1,0 +1,78 @@
+# Reference behavior tree for the bimanual t-shirt fold
+# (Panda left + FR3 right + SSG-48 jaws + static rear ZED Mini).
+#
+# Hardware-validated fold plan expressed as a SPARK score over the bimanual
+# cloth primitives, kept as an in-context example in the spirit of the BT
+# cache: successful plans from completed tasks are offered back to the planner.
+# The planner is shown this ONLY for the bimanual_franka family, as an example
+# to imitate when the instruction is "fold the shirt" / "fold the t-shirt".
+#
+# Two ways to express it:
+#
+#   A) One leaf: bimanual_shirt_fold orchestrates detect -> sleeves ->
+#      re-perceive -> hem internally. PREFER THIS for a plain fold request.
+#
+#   B) Explicit primitive chain (below): use when the task needs custom
+#      grasp/land points or partial folds. Each phase re-perceives; do NOT
+#      hardcode coordinates across phases.
+#
+# Key validated facts encoded here:
+#   - sleeve grasps are the OUTER-EDGE (tip) points; per-sleeve OBB-minor-axis
+#     jaw yaw; RIGHT arm folds the camera-LEFT sleeve and vice versa.
+#   - both arms grasp, then LIFT TOGETHER (durations equalized), then arc-drape.
+#   - sleeves drape to the garment-center y one phase, hem corners come from the
+#     DEPTH-VALID cloud (lowest-x band, +/-y extremes) after RE-DETECTION.
+#   - left jaw yaw = right yaw + 90 deg mount offset + 180 deg camera flip
+#     (applied automatically by the skill; the BT passes the same yaw to both).
+#   - hem x offsets (right/left) and the left 180 deg flip come from the family
+#     profile cloth() block (configs/machines/ANON-LAB.yaml cloth:).
+#   - SSG-48 raw >= 250 on a jaw means it closed on air: the grasp primitive
+#     FAILS the skill so a replan/recovery can fire.
+
+# --- Option A: single orchestrator leaf (preferred) ---
+task: fold the t-shirt (bimanual, ANON-LAB)
+tree:
+  type: sequence
+  children:
+    - type: bimanual_shirt_fold
+      params:
+        instruction: "fold the t-shirt"
+
+# --- Option B: explicit primitive chain (for custom folds) ---
+# task: fold the t-shirt (bimanual, explicit)
+# tree:
+#   type: sequence
+#   children:
+#     # Sleeves: grasp both tips, synced lift, arc each to garment center.
+#     - type: bimanual_grasp_points
+#       params:
+#         left_point: [0.50, 0.18, -0.035]    # right sleeve tip, left base frame
+#         right_point: [0.50, -0.18, -0.035]  # left sleeve tip, right base frame
+#         left_yaw_rad: 0.0                    # OBB-minor-axis yaw (right sleeve)
+#         right_yaw_rad: 0.0                   # OBB-minor-axis yaw (left sleeve)
+#         force: 15
+#     - type: bimanual_lift_together
+#       params: {lift_height: 0.13}
+#     - type: bimanual_arc_drape
+#       params:
+#         both_arms: true
+#         steps: 8
+#         left_land_xy: [0.50, 0.02]    # 80% toward garment center y
+#         right_land_xy: [0.50, -0.02]
+#     # RE-PERCEIVE before the hem phase (do not reuse sleeve coordinates).
+#     # Hem: pinch both corners, synced lift, simultaneous drape to collar.
+#     - type: bimanual_grasp_points
+#       params:
+#         left_point: [0.42, 0.16, -0.035]   # hem corner (left base frame)
+#         right_point: [0.42, -0.16, -0.035] # hem corner (right base frame)
+#         left_yaw_rad: 0.0
+#         right_yaw_rad: 0.0
+#         force: 15
+#     - type: bimanual_lift_together
+#       params: {lift_height: 0.13}
+#     - type: bimanual_arc_drape
+#       params:
+#         both_arms: true
+#         steps: 10
+#         arc_peak: 0.06       # 1.5x the sleeve peak for the body fold
+#         land_x: 0.74         # drape to the collar

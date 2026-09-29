@@ -1,0 +1,33 @@
+# U2: Sweep loose screws into a dustpan with a brush
+# Tool-use with affordance reasoning - pick the brush, align its bristles
+# against the table surface, then iterate sweep passes toward the
+# dustpan. Differentiator vs Goal-VLA Table Sweeping (one-shot) and
+# TwinVLA brush_to_dustpan (imitation-trained).
+task: sweep the screws into the dustpan using the brush
+tree:
+  type: sequence
+  children:
+    - type: grasp_se3
+      params:
+        keypoint_label: "brush handle"
+        prefer_angled: false
+        force: 30
+        target_width: 0.025
+        grip_end: back
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.10}
+    - type: tool_grip_pose
+      params:
+        tool_label: "brush"
+        workpiece_label: "table"
+        approach_height: 0.02
+    - type: sweep_to_container
+      params:
+        container_label: "dustpan"
+        clutter_label: "screw"
+        max_passes: 6
+        sweep_height: 0.005
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.15}
+    - type: release
+      params: {tilt_angle: 0, roll_sign: 0}

@@ -1,0 +1,64 @@
+# "stack the blocks of same color" -- 50 human episodes.
+#
+# THE STAGED PAIR COLOUR CHANGES BETWEEN EPISODES. Verified directly:
+# episode_0000 is staged with two BLUE cubes, episode_0030 with two
+# near-WHITE cubes. Both are the same instruction and the same success
+# criterion. Any registry entry that hard-codes a colour is wrong for
+# roughly half the corpus.
+#
+# The mechanism that survives this: prompt for BOTH colours every run,
+# allow either to return two instances, and let `require.any_group_count`
+# pick whichever group actually found a pair. `alias_as` then publishes
+# that pair under colour-free role names, so ONE cached behaviour tree
+# drives all 50 episodes:
+#
+#     same color block 1   -> the geometrically-first cube of the pair
+#     same color block 2   -> the second
+#
+# The BT must address those role names, not "blue block 1"/"gray block 1".
+task: "stack the blocks of same color"
+aliases:
+  - "stack the same colored blocks"
+  - "stack the blocks of the same color"
+  - "stack the two blocks that match"
+  - "stack the blocks of same colour"
+
+# Mandatory here. The whole point of the task is to end with one cube on
+# top of the other; rewriting both to a median Z erases exactly the signal
+# the second pick and the success check depend on.
+per_instance_z: true
+
+groups:
+  - text: "blue block"
+    multi_instance: true
+    expect: {min: 0, max: 2}
+    min_conf: 0.15
+    # World-frame ordering, not image-frame: these detections are merged
+    # across birdview and sideview, so their centroid_2d live in different
+    # image planes and an image-space sort would not be a total order over
+    # the merged set. Base-frame X then Y is camera-independent and gives
+    # the same index to the same physical cube on every run.
+    order_by: [world_x, world_y]
+    alt_prompts: ["blue cube"]
+
+  - text: "gray block"
+    multi_instance: true
+    expect: {min: 0, max: 2}
+    min_conf: 0.15
+    order_by: [world_x, world_y]
+    alt_prompts: ["white block", "grey block", "light gray block", "gray cube"]
+
+require:
+  any_group_count: 2
+  alias_as: "same color block"
+
+# Optional hue cross-check. Left OFF: with only two cubes on a bare table
+# the count gate already resolves the pair, and clustering can only cost
+# recall. Turn it on if the rig starts staging distractor cubes.
+disambiguate:
+  hsv_cluster: false
+  hue_tol_deg: 15.0
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

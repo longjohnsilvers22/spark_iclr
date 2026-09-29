@@ -1,0 +1,41 @@
+// SPARK BT-DSL grammar
+// Surface form: an S-expression-like canonical serialization of a SPARK
+// behavior tree.  Every BT YAML produced by the SPARK runners can be losslessly
+// rendered into this surface (see skill_library.bt_to_canonical) and then
+// parsed by this grammar.  The grammar enforces the *structural* constraints
+// (root must be a Sequence, every leaf is an action with a primitive + slots);
+// per-primitive slot typing is enforced separately by SkillLibrary.validate_bt.
+//
+// Example canonical form:
+//   (sequence
+//     (action segment_sam3_text_prompt :prompts ["red block" "blue plate"])
+//     (action goto_pose :keypoint_label "red block" :offset_z 0.0)
+//     (action close_gripper :force 100)
+//     (action place :keypoint_label "blue plate" :offset_z 0.05))
+
+start: node
+
+node: sequence | selector | action
+
+sequence: "(" "sequence" node+ ")"
+selector: "(" "selector" node+ ")"
+
+action: "(" "action" PRIMITIVE_NAME slot* ")"
+
+slot: SLOT_KEY value
+
+value: STRING
+     | SIGNED_NUMBER  -> number
+     | BOOL           -> bool
+     | list
+
+list: "[" value* "]"
+
+PRIMITIVE_NAME: /[a-z_][a-z0-9_]*/
+SLOT_KEY: /:[a-z_][a-z0-9_]*/
+BOOL: "true" | "false" | "null"
+STRING: /"([^"\\]|\\.)*"/
+
+%import common.SIGNED_NUMBER
+%import common.WS
+%ignore WS

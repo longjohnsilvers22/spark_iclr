@@ -1,0 +1,257 @@
+<mujoco model="corl_dustpan_franka">
+  <!--
+    CoRL dustpan sweep task -- improved visuals.
+      - Panda arm at world origin.
+      - Clean solid-color table (light wood, 600x600x20mm, surface at z=0.42).
+      - Dustpan: composite shape with base, 3 walls, open front. Welded to table.
+      - Debris: 5 cubes (22mm side), bright distinct colors, freejoints.
+      - Brush: handle cylinder + dark bristle plate. Freejoint for grasping.
+      - Cameras positioned to avoid arm occlusion.
+
+    Trajectory the test exercises:
+      Phase 1: top-down grasp brush
+      Phase 2: lift to safe ceiling
+      Phase 3: transit to behind debris (opposite side from dustpan)
+      Phase 4: descend brush to table surface
+      Phase 5: sweep forward (push debris toward dustpan)
+      Phase 6: lift brush, retreat
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/franka_emika_panda/assets"/>
+
+  <include file="_panda_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.5 0.5 0.5" ambient="0.25 0.25 0.25" specular="0.1 0.1 0.1"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="135" elevation="-25" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <!-- Clean solid light-wood table (no texture) -->
+    <material name="table_mat" rgba="0.85 0.75 0.6 1"
+              reflectance="0.15" shininess="0.2" specular="0.1"/>
+
+    <!-- Dustpan: dark gray -->
+    <material name="dustpan_mat" rgba="0.3 0.3 0.3 1"
+              specular="0.3" shininess="0.2" reflectance="0.1"/>
+    <material name="dustpan_wall_mat" rgba="0.35 0.35 0.35 1"
+              specular="0.3" shininess="0.2" reflectance="0.1"/>
+
+    <!-- Brush: light brown handle, dark brown bristles -->
+    <material name="brush_handle_mat" rgba="0.7 0.5 0.3 1"
+              specular="0.2" shininess="0.1" reflectance="0.05"/>
+    <material name="brush_bristle_mat" rgba="0.4 0.25 0.1 1"
+              specular="0.05" shininess="0.02" reflectance="0.01"/>
+
+    <!-- Debris: 5 bright distinct colors -->
+    <material name="debris_red" rgba="1 0 0 1"
+              specular="0.4" shininess="0.3"/>
+    <material name="debris_blue" rgba="0 0 1 1"
+              specular="0.4" shininess="0.3"/>
+    <material name="debris_green" rgba="0 0.8 0 1"
+              specular="0.4" shininess="0.3"/>
+    <material name="debris_yellow" rgba="1 1 0 1"
+              specular="0.4" shininess="0.3"/>
+    <material name="debris_orange" rgba="1 0.5 0 1"
+              specular="0.4" shininess="0.3"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.3 0.3 0.3"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: 600x600x20mm clean solid-color box. Centre at z=0.41, surface at z=0.42 -->
+    <body name="table" pos="0.55 0 0.41">
+      <geom name="table_top" type="box" size="0.30 0.30 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1.0 0.5 0.0001"/>
+      <!-- Table legs (visual only) -->
+      <geom name="leg1" type="cylinder" size="0.02 0.20" pos="-0.26 -0.26 -0.21"
+            rgba="0.6 0.5 0.4 1" contype="0" conaffinity="0"/>
+      <geom name="leg2" type="cylinder" size="0.02 0.20" pos="0.26 -0.26 -0.21"
+            rgba="0.6 0.5 0.4 1" contype="0" conaffinity="0"/>
+      <geom name="leg3" type="cylinder" size="0.02 0.20" pos="-0.26 0.26 -0.21"
+            rgba="0.6 0.5 0.4 1" contype="0" conaffinity="0"/>
+      <geom name="leg4" type="cylinder" size="0.02 0.20" pos="0.26 0.26 -0.21"
+            rgba="0.6 0.5 0.4 1" contype="0" conaffinity="0"/>
+    </body>
+
+    <!--
+      Dustpan: welded to world. Positioned on table surface (z=0.42).
+      Base 150x120x3mm flat. 3 walls: left, right (20mm tall), back (25mm tall).
+      Front edge open for sweeping debris in. Open front faces -Y (toward robot).
+    -->
+    <body name="dustpan" pos="0.55 0.22 0.42">
+      <!-- Base plate: 150x120x3mm -->
+      <geom name="dustpan_base" type="box" size="0.075 0.06 0.0015"
+            pos="0 0 0.0015" material="dustpan_mat"
+            friction="0.8 0.4 0.001"/>
+      <!-- Front lip: thin angled edge 150x3x3mm to help scoop -->
+      <geom name="dustpan_front_lip" type="box" size="0.075 0.003 0.0015"
+            pos="0 -0.057 0.0015" material="dustpan_wall_mat"
+            friction="0.8 0.4 0.001"/>
+      <!-- Back wall: 150x3x25mm (taller to catch debris) -->
+      <geom name="dustpan_back" type="box" size="0.075 0.0015 0.0125"
+            pos="0 0.0585 0.0155" material="dustpan_wall_mat"
+            friction="0.8 0.4 0.001"/>
+      <!-- Left wall: 3x120x20mm -->
+      <geom name="dustpan_left" type="box" size="0.0015 0.06 0.01"
+            pos="-0.0735 0 0.013" material="dustpan_wall_mat"
+            friction="0.8 0.4 0.001"/>
+      <!-- Right wall: 3x120x20mm -->
+      <geom name="dustpan_right" type="box" size="0.0015 0.06 0.01"
+            pos="0.0735 0 0.013" material="dustpan_wall_mat"
+            friction="0.8 0.4 0.001"/>
+      <site name="dustpan_opening" pos="0 -0.06 0.005" size="0.005" rgba="0 1 0 0"/>
+    </body>
+
+    <!--
+      Brush: box handle + bristle plate.
+        - Handle: box 25x15x30mm (graspable by Panda; Y=15mm < 40mm finger gap)
+        - Bristle plate: box 80x10x15mm, dark brown, below handle
+        - Bristle fringe: thin dark strip at very bottom
+      Body origin at the bristle plate bottom (z=0 on table).
+      Handle sits on top of the bristle plate.
+    -->
+    <body name="brush" pos="0.45 -0.15 0.42">
+      <freejoint name="brush_free"/>
+      <!-- Bristle plate: 120x30x12mm (wide sweeping surface, clearly visible) -->
+      <geom name="brush_bristle" type="box" size="0.06 0.015 0.006"
+            pos="0 0 0.006" material="brush_bristle_mat"
+            condim="6" friction="2.0 1.0 0.003"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Bristle fringe: dark strip at very bottom for visual -->
+      <geom name="brush_fringe" type="box" size="0.058 0.016 0.003"
+            pos="0 0 0.003" rgba="0.25 0.15 0.05 1"
+            condim="6" friction="2.0 1.0 0.003"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <!-- Handle block: 25x15x40mm box on top of bristle plate.
+           Y=15mm fits Panda finger gap (0-40mm). -->
+      <geom name="brush_handle" type="box" size="0.0125 0.0075 0.020"
+            pos="0 0 0.032" material="brush_handle_mat"
+            condim="6" friction="1.5 0.8 0.002"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <inertial pos="0 0 0.02" mass="0.08"
+                diaginertia="0.00005 0.00004 0.00003"/>
+    </body>
+
+    <!--
+      Debris: 5 cubes (22mm = 0.011 half-size), bright colors.
+      Scattered 100-200mm in front of dustpan opening.
+      Dustpan opening at Y=0.22-0.06 = 0.16 (in world).
+      Debris at Y = -0.05 to 0.10 (100-300mm in front of dustpan).
+      On table surface at z=0.42 + half-cube = 0.431.
+    -->
+    <body name="debris_1" pos="0.50 0.02 0.431">
+      <freejoint name="debris_1_free"/>
+      <geom name="debris_1_geom" type="box" size="0.011 0.011 0.011"
+            material="debris_red"
+            condim="6" friction="0.6 0.3 0.001"
+            solimp="0.9 0.95 0.003" solref="0.02 1"
+            mass="0.010"/>
+      <inertial pos="0 0 0" mass="0.010"
+                diaginertia="8e-7 8e-7 8e-7"/>
+    </body>
+
+    <body name="debris_2" pos="0.58 0.00 0.431">
+      <freejoint name="debris_2_free"/>
+      <geom name="debris_2_geom" type="box" size="0.011 0.011 0.011"
+            material="debris_blue"
+            condim="6" friction="0.6 0.3 0.001"
+            solimp="0.9 0.95 0.003" solref="0.02 1"
+            mass="0.010"/>
+      <inertial pos="0 0 0" mass="0.010"
+                diaginertia="8e-7 8e-7 8e-7"/>
+    </body>
+
+    <body name="debris_3" pos="0.48 0.07 0.431">
+      <freejoint name="debris_3_free"/>
+      <geom name="debris_3_geom" type="box" size="0.011 0.011 0.011"
+            material="debris_green"
+            condim="6" friction="0.6 0.3 0.001"
+            solimp="0.9 0.95 0.003" solref="0.02 1"
+            mass="0.010"/>
+      <inertial pos="0 0 0" mass="0.010"
+                diaginertia="8e-7 8e-7 8e-7"/>
+    </body>
+
+    <body name="debris_4" pos="0.56 0.06 0.431">
+      <freejoint name="debris_4_free"/>
+      <geom name="debris_4_geom" type="box" size="0.011 0.011 0.011"
+            material="debris_yellow"
+            condim="6" friction="0.6 0.3 0.001"
+            solimp="0.9 0.95 0.003" solref="0.02 1"
+            mass="0.010"/>
+      <inertial pos="0 0 0" mass="0.010"
+                diaginertia="8e-7 8e-7 8e-7"/>
+    </body>
+
+    <body name="debris_5" pos="0.53 0.04 0.431">
+      <freejoint name="debris_5_free"/>
+      <geom name="debris_5_geom" type="box" size="0.011 0.011 0.011"
+            material="debris_orange"
+            condim="6" friction="0.6 0.3 0.001"
+            solimp="0.9 0.95 0.003" solref="0.02 1"
+            mass="0.010"/>
+      <inertial pos="0 0 0" mass="0.010"
+                diaginertia="8e-7 8e-7 8e-7"/>
+    </body>
+
+    <!-- Cameras: positioned to clearly show workspace without arm occlusion -->
+
+    <!-- Camera target: centre of the dustpan/debris work area on table surface -->
+    <body name="cam_target" pos="0.52 0.05 0.42">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+
+    <!-- Agentview: 3/4 angle from behind-right, elevated. Robot arm on left side
+         of frame so dustpan + debris are clearly visible. -->
+    <body name="cam_agent_body" pos="1.2 -0.7 1.0">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+
+    <!-- Sideview: from the right side -->
+    <body name="cam_side_body" pos="0.55 -1.1 0.7">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+
+    <!-- Topview: directly overhead, looking straight down at dustpan area.
+         Offset slightly in +X and -Y from the target to avoid arm occlusion. -->
+    <body name="cam_top_body" pos="0.55 0.05 1.6">
+      <camera name="topview" fovy="45" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <!--
+    Keyframe: Panda home (7 arm + 2 finger) + brush (7 free: 3 pos + 4 quat)
+    + 5 debris (7 free each) = 9 + 7 + 7*5 = 51 qpos values.
+  -->
+  <keyframe>
+    <key name="home"
+         qpos="0 -0.785 0 -2.356 0 1.571 0.785 0.04 0.04
+               0.45 -0.15 0.42 1 0 0 0
+               0.50 0.02 0.431 1 0 0 0
+               0.58 0.00 0.431 1 0 0 0
+               0.48 0.07 0.431 1 0 0 0
+               0.56 0.06 0.431 1 0 0 0
+               0.53 0.04 0.431 1 0 0 0"
+         ctrl="0 -0.785 0 -2.356 0 1.571 0.785 255"/>
+  </keyframe>
+</mujoco>

@@ -1,0 +1,56 @@
+# CoRL bimanual dustpan sweep task.
+# Pre-baked BT score for the production bimanual executor.
+# Exercises:
+#   - pick_with_arm (left)  -- grasp dustpan by its handle
+#   - pick_with_arm (right) -- grasp brush by its handle
+#   - hold_in_place (left)  -- anchor dustpan during sweep
+#   - sweep (right)         -- multi-pass push debris into dustpan
+#     (sweep direction computed from dustpan_opening_site and
+#      dustpan_center_site: sweep_dir = normalize(center - opening),
+#      works for ANY dustpan rotation)
+#   - release_arm (both)    -- release tools
+#
+# The sweep primitive computes direction from the dustpan's two sites:
+#   opening_pos = get_site_pos("dustpan_opening_site")
+#   center_pos  = get_site_pos("dustpan_center_site")
+#   sweep_dir   = normalize(center - opening)   # INTO the pan
+#   stroke_dir  = cross([0,0,1], sweep_dir)      # lateral strokes
+tree:
+  type: sequence
+  children:
+    # Phase 1: Both arms grasp tools in parallel
+    - type: parallel
+      children:
+        - type: pick_with_arm
+          params:
+            arm: left
+            keypoint_label: dustpan handle
+            target_width: 0.015
+            force: 60
+        - type: pick_with_arm
+          params:
+            arm: right
+            keypoint_label: brush
+            target_width: 0.020
+            force: 60
+    # Phase 2: Left holds dustpan, right sweeps debris into it
+    - type: parallel
+      children:
+        - type: hold_in_place
+          params:
+            arm: left
+            dwell: 15.0
+        - type: sweep
+          params:
+            arm: right
+            area_label: debris
+            target_label: dustpan
+            n_passes: 3
+            sweep_height_m: 0.005
+    # Phase 3: Both release
+    - type: parallel
+      children:
+        - type: release_arm
+          params: {arm: left}
+        - type: release_arm
+          params: {arm: right}

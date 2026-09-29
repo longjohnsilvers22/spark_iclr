@@ -1,0 +1,139 @@
+<mujoco model="corl_ur10e_fold">
+  <!--
+    CoRL: fold cloth task with UR10e + Robotiq 2F-85.
+    Adapted from corl_f4_fold_cloth.xml (Panda version).
+    REAL deformable cloth via MuJoCo flexcomp.
+
+      - UR10e base at (-0.6, 0, 0.225), rotated 90deg to face +X.
+      - Table in front of robot (top at z=0.225).
+      - 16x16 flexcomp cloth grid on table surface.
+      - Graspable pinch tab at the free edge.
+      - Cameras: agentview, sideview, topview.
+
+    Cloth layout (top view, world +X is "away from robot"):
+
+      pinned edge (row 0)  x = 0.0325   (vertices 0..15, pinned)
+      pinned edge (row 1)  x = 0.0445   (vertices 16..31, pinned)
+        |
+        | ~180mm
+        v
+      free edge   (row 15) x = 0.2125   (vertices 240..255, free to move)
+
+    A small graspable "pinch tab" body is connect-constrained to cloth_247
+    (center of free edge). The Robotiq 2F-85 gripper pinches this tab,
+    lifts, arcs over, and releases to fold the cloth onto itself.
+  -->
+
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../../mujoco_menagerie/universal_robots_ur10e/assets"/>
+
+  <option gravity="0 0 -9.81" timestep="0.002" integrator="RK4"/>
+  <size nconmax="8000" njmax="16000"/>
+
+  <include file="_ur10e_base.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="800" offheight="600"/>
+  </visual>
+
+  <statistic center="0 0 0.5" extent="1.5"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="handle_mat" rgba="0.3 0.9 0.3 1"
+              specular="0.1" shininess="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!-- Table: top surface at z=0.225 to match UR10e base height -->
+    <body name="table" pos="0.1 0 0.215">
+      <geom name="table_top" type="box" size="0.45 0.40 0.01"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+    </body>
+
+    <!--
+      Deformable cloth: 16x16 flexcomp grid = ~180mm x 180mm.
+      Placed on table surface at z=0.225 + small offset = 0.245.
+      Centered at x=0.12 (reachable by UR10e workspace).
+      Pin rows 0 AND 1 (vertices 0-31) for a stable fold line near robot.
+      Free edge (row 15, vertices 240-255) at x=0.212 is graspable.
+      radius=0.006 gives smaller contact spheres for finer cloth.
+      mass=0.03 total -> light for natural draping.
+      edge damping=0.04: low enough for natural cloth behavior.
+    -->
+    <flexcomp name="cloth" type="grid" count="16 16 1" spacing="0.012 0.012 0.012"
+              pos="0.12 0 0.245" mass="0.03"
+              rgba="0.92 0.25 0.25 0.85"
+              radius="0.006">
+      <edge damping="0.04"/>
+      <pin id="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31"/>
+    </flexcomp>
+
+    <!--
+      Graspable pinch tab: box at the center of the free edge.
+      Connect-constrained to cloth_247 (center of row 15, col 7 in 16x16 grid).
+      The Robotiq 2F-85 gripper closes on this tab.
+      Size: 50mm(X) x 30mm(Y) x 40mm(Z) -- large enough for Robotiq pads.
+      Sits with its base at z=0.230 (just above table), so centre at z=0.250.
+      Free edge x = 0.12 + 0.090 = 0.210.
+    -->
+    <body name="pinch_corner" pos="0.210 0 0.230">
+      <freejoint/>
+      <inertial pos="0 0 0.020" mass="0.010" diaginertia="1e-6 1e-6 1e-6"/>
+      <geom name="pinch_corner_geom" type="box"
+            size="0.025 0.015 0.020"
+            material="handle_mat" mass="0.010"
+            condim="6" friction="5 3 0.005"
+            solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <site name="pinch_target" pos="0 0 0.025" size="0.005"
+            rgba="0 1 0 0" type="sphere"/>
+    </body>
+
+    <!-- ================================================================
+         CAMERAS
+         ================================================================ -->
+    <body name="cam_target" pos="0.12 0 0.25">
+      <site name="cam_target_site" pos="0 0 0" size="0.001" rgba="0 0 0 0"/>
+    </body>
+    <body name="cam_agent_body" pos="1.2 0.0 0.8">
+      <camera name="agentview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_side_body" pos="0.12 -1.2 0.6">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+    <body name="cam_top_body" pos="0.12 0 1.5">
+      <camera name="topview" fovy="50" pos="0 0 0"
+              mode="targetbody" target="cam_target"/>
+    </body>
+  </worldbody>
+
+  <equality>
+    <!-- Point-to-point constraint tying pinch tab to cloth center-edge vertex
+         (16x16 grid: row 15, col 7 = vertex 247) -->
+    <connect name="cloth_tab_connect" body1="cloth_247" body2="pinch_corner" anchor="0 0 0"
+             solref="0.02 1" solimp="0.9 0.95 0.01"/>
+    <!-- Grasp weld: disabled by default. Activated when gripper closes on tab,
+         deactivated on release. Simulates high-friction compliant fingertips.
+         relpose offset 0.145 matches Robotiq 2F-85 pinch site. -->
+    <weld name="grasp_weld" body1="base2" body2="pinch_corner"
+          relpose="0 0 0.145 1 0 0 0"
+          solref="0.01 1" solimp="0.95 0.99 0.001" active="false"/>
+  </equality>
+</mujoco>

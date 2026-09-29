@@ -1,0 +1,77 @@
+# CoRL peg insertion task BT
+# Sequence: top-down grasp flat peg -> roll vertical -> transport -> wiggle insert -> release
+#
+# This BT uses existing skills from spark_real:
+#   - move_to_keypoint (primitives.py)
+#   - grasp (primitives.py)
+#   - move_relative (primitives.py)
+#   - wiggle (manipulation.py)
+#   - release (primitives.py)
+#
+# The "roll vertical" step is a move_relative with orientation change;
+# in simulation we implement it as a wrist rotation in the test script.
+
+name: peg_insertion
+description: >
+  Pick up a peg lying flat on the table, roll the wrist to make the peg
+  vertical (pointing down), transport to above the insertion hole, descend
+  with wiggle/spiral search to insert, then release.
+
+sequence:
+  - action: move_to_keypoint
+    params:
+      keypoint_label: "peg"
+      offset_x: 0.0
+      offset_y: 0.0
+      offset_z: 0.02
+
+  - action: grasp
+    params:
+      force: 60
+
+  # Lift peg off table
+  - action: move_relative
+    params:
+      dx: 0.0
+      dy: 0.0
+      dz: 0.15
+
+  # Roll wrist 90 degrees so peg is vertical (pointing down).
+  # In real-robot execution this is handled by move_to_keypoint with
+  # orientation override or a custom roll primitive.
+  # In sim, the test script handles the SE(3) rotation directly.
+
+  # Transport to above hole
+  - action: move_to_keypoint
+    params:
+      keypoint_label: "hole"
+      offset_x: 0.0
+      offset_y: 0.0
+      offset_z: 0.06
+
+  # Descend toward hole
+  - action: move_relative
+    params:
+      dx: 0.0
+      dy: 0.0
+      dz: -0.03
+
+  # Wiggle for insertion assistance
+  - action: wiggle
+    params:
+      amplitude: 0.002
+      frequency: 3.0
+      duration: 3.0
+      axis: "xy"
+      force_threshold: 15.0
+
+  # Final push down
+  - action: move_relative
+    params:
+      dx: 0.0
+      dy: 0.0
+      dz: -0.025
+
+  # Release peg in hole
+  - action: release
+    params: {}

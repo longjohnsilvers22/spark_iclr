@@ -1,0 +1,31 @@
+# "put the knife in the tray" -- 42 human episodes.
+#
+# Scene (verified against camera_1/frame_0000 of the human corpus): one
+# slotted cutlery tray at table-left, one knife lying to its right. The
+# knife has a pale handle and a specular steel blade.
+#
+# Grasp prompt is "knife handle", never "knife": the bare noun grounds on
+# the blade, which the gripper cannot close on and which reads as a
+# near-zero OBB minor axis.
+task: "put the knife in the tray"
+aliases:
+  - "place the knife in the tray"
+  - "pick up the knife and place it in the tray"
+  - "put knife in tray"
+
+groups:
+  - text: "knife handle"
+    expect: {min: 1, max: 1}
+    min_conf: 0.10
+    alt_prompts: ["knife", "white knife handle"]
+
+  - text: "tray"
+    expect: {min: 1, max: 1}
+    min_conf: 0.10
+    # The tray is gray-on-gray against the table, so it is the likelier of
+    # the two to be missed. These retries are ordered most-specific first.
+    alt_prompts: ["cutlery tray", "silverware tray", "utensil tray"]
+
+fallback:
+  relax_secondary_score: 0.30
+  on_mismatch: abort

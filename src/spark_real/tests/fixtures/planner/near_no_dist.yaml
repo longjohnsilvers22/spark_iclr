@@ -1,0 +1,13 @@
+```yaml
+task: move the knife next to the tray
+tree:
+  type: sequence
+  children:
+    - type: release
+      params: {}
+verify:
+  all:
+    - pred: near
+      obj: "knife handle 1"
+      target: "tray"
+```

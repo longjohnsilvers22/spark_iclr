@@ -1,0 +1,24 @@
+task: "put the knife in the tray"
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "knife handle 1"
+      __robointer:
+        subtask: "grab it"
+        primitive_skill: teleport
+        label: "banana"
+        object_box: [[380, 470], [700, 545]]
+        contact_point: [910, 120]
+        trace: [[425, 508]]
+        state_affordance: [0.1, 0.2, 0.3, 90.0, 0.0, 0.0]
+        grip_force: 60
+    - type: grasp
+      params:
+        force: 60
+      __robointer:
+        placement_proposal: "the left half"
+        contact_point: [1400, 2200]
+    - type: release
+      __robointer: "just put it down"

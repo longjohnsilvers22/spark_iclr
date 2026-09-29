@@ -1,0 +1,15 @@
+# U3: Single-arm sponge-wash of a plate
+# Force-tracked constrained_scrub - maintains a target normal force while
+# oscillating in the tangent plane. Differentiator vs MolmoAct wipe_table
+# (open-loop wipe) and A1 wipe-with-cloth.
+task: wash the plate with the sponge then rinse it in the sink
+tree:
+  type: sequence
+  children:
+    - type: sponge_wash
+      params:
+        sponge_label: "sponge"
+        dish_label: "plate"
+        sink_label: "sink"
+        duration: 6.0
+        normal_force: 8.0

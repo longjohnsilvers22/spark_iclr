@@ -1,0 +1,66 @@
+# Task 2 of the human-parity demo set: "put the pen in the bin".
+#
+# ############  NOT INSTALLED  ############
+# todo: true, so load_seeds() parses and REPORTS this file but
+# seed_library() does not put it in the cache. That is deliberate.
+#
+# There is no successful pen/bin behaviour tree anywhere in the run
+# history -- the live library has 88 entries and not one of them mentions
+# a pen or a bin. Every other seed in this directory was captured from a
+# tree that actually ran green on this rig; inventing one for this task
+# would break that rule and is explicitly out of scope (seeds capture what
+# worked, they do not author plans).
+#
+# TO POPULATE THIS TASK, pick one:
+#
+#   (a) preferred -- run it once with the planner on:
+#         POST /api/bt/toggle_cache {"enabled": false}
+#         POST /api/execute {"instruction": "put the pen in the bin", ...}
+#       Watch it. If it verifies successful the tree lands in the library
+#       automatically with success=1 and every later run is cache-served.
+#       Export it back here with:
+#         python scripts/bt_seed_export.py --instruction "put the pen in the bin"
+#
+#   (b) if you have eyes on the scene and trust the candidate below,
+#       flip `todo: false` and restart the server. The candidate is the
+#       proven knife -> tray pick-and-place structure with the two labels
+#       swapped; the STRUCTURE has run green many times, the pen/bin
+#       LABELS have never been grounded by SAM3 on this rig. Supervise the
+#       first run either way.
+#
+todo: true
+todo_reason: >-
+  No pen/bin tree has ever run successfully on this rig. Candidate below is
+  a label swap of the verified knife->tray pick-place, not a capture.
+instruction: "put the pen in the bin"
+aliases:
+  - "pick up the pen and place it in the bin"
+  - "place the pen in the bin"
+  - "put pen in bin"
+objects: ["pen", "bin"]
+priority: 10
+promote: false
+verified: false
+provenance: >-
+  Candidate only. Structure from 0b20251e4902 ("pick up knife and place it
+  in the tray", success=1 fail=0) with knife handle -> pen and tray -> bin.
+notes: >-
+  Grasp force/width copied from the knife tree (50 N, 1 cm) because a pen
+  is a similar thin cylinder. Release offset over the bin is 0.10 rather
+  than the tray's 0.05: a bin has walls, and the gripper needs to clear
+  the rim before opening.
+score:
+  task: "put the pen in the bin"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "pen", offset_z: 0.0}
+      - type: grasp
+        params: {force: 50, target_width: 0.01}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: move_to_keypoint
+        params: {keypoint_label: "bin", offset_z: 0.10}
+      - type: release
+        params: {tilt_angle: 0.0}

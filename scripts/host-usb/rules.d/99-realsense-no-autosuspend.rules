@@ -1,0 +1,4 @@
+# Disable USB autosuspend for Intel RealSense D400 series for stream stability.
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b3a", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b07", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0ad3", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"

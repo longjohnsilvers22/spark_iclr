@@ -1,0 +1,33 @@
+```yaml
+task: pick up the plushie and place in bowl
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "plushie"
+        offset_z: 0
+        grasp_strategy: "topdown"
+    - type: grasp
+      params:
+        force: 20
+        target_width: 0.030
+        grasp_strategy: "topdown"
+    - type: move_relative
+      params:
+        dz: 0.20
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "bowl"
+        offset_z: 0.15
+    - type: release
+      params: {}
+verify:
+  all:
+    - pred: inside
+      obj: "plushie"
+      container: "bowl"
+    - pred: held
+      obj: "plushie"
+      value: false
+```

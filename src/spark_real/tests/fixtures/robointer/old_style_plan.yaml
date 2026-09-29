@@ -1,0 +1,19 @@
+task: "put the pen in the bin"
+tree:
+  type: sequence
+  children:
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "pen"
+        offset_z: 0
+    - type: grasp
+      params:
+        force: 50
+        target_width: 0.01
+    - type: move_relative
+      params: {dx: 0, dy: 0, dz: 0.2}
+    - type: move_to_keypoint
+      params:
+        keypoint_label: "bin"
+        offset_z: 0.15
+    - type: release

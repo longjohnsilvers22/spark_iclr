@@ -1,0 +1,241 @@
+<mujoco model="cup_pour_scene">
+  <!--
+    SPARK pour-task validation scene.
+
+    Layout:
+      - Franka Panda mounted on a pedestal at world origin (-0.6, 0, 0.225).
+        Panda is the practical stand-in for the real-rig FR3 (the
+        franka_fr3 menagerie package ships NO gripper, while panda.xml
+        includes hand+fingers and is what LIBERO uses).
+      - Plastic cup (white cylindrical, 110mm tall, 70mm OD): +X side
+        of the table, ~0.4m forward of base.
+      - Bowl (open shallow cylinder, 80mm tall, 200mm OD): -X side.
+      - Two cameras:
+          * birdview: above-and-side, mimics real Kinect mount
+          * sideview: table-level perpendicular, mimics second Kinect
+      - Table: 1.0m x 0.8m, top at z=0.42 (same height as
+        perception_test_scene so primitives carry over).
+
+    NOTE: sim_pipeline.py's StandaloneMuJoCoSim assumes UR10e
+    (6-DOF, qpos[:6], tcp site named 'pinch'). This scene swaps in
+    a 7-DOF Panda, so the custom IK + ee_position helpers in
+    sim_pipeline will be miscalibrated, but the perception /
+    planning legs run unchanged.
+  -->
+
+  <!--
+    meshdir must be set at the top level: when panda.xml is included,
+    MuJoCo ignores the included file's compiler tag, so we need to
+    point at the menagerie's assets directory here.
+  -->
+  <compiler angle="radian" autolimits="true"
+            meshdir="../../mujoco_menagerie/franka_emika_panda/assets"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <!--
+    Pull in a local copy of the menagerie Panda (arm + hand + fingers
+    + actuators). The local copy has its own <compiler> tag stripped
+    so the parent's meshdir wins — MuJoCo silently drops the
+    "assets/" segment when the included file's own meshdir is left
+    in place during include.
+  -->
+  <include file="_panda_for_pour.xml"/>
+
+  <visual>
+    <headlight diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="640" offheight="480"/>
+  </visual>
+
+  <statistic center="0.4 0 0.5" extent="1.2"/>
+
+  <asset>
+    <!-- Backdrop / floor -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.8"
+             rgb2="0.1 0.2 0.4" width="512" height="3072"/>
+    <texture type="2d" name="lab_floor" builtin="checker"
+             rgb1="0.35 0.4 0.45" rgb2="0.25 0.3 0.35" width="512" height="512"
+             mark="cross" markrgb="0.8 0.8 0.9"/>
+    <material name="groundplane" texture="lab_floor" texrepeat="20 20"
+              reflectance="0.3" shininess="0.1"/>
+
+    <!-- Workspace materials -->
+    <material name="table_mat" rgba="0.7 0.5 0.3 1" reflectance="0.4" shininess="0.3"/>
+    <material name="pedestal_mat" rgba="0.3 0.4 0.7 1" reflectance="0.5" shininess="0.4"/>
+    <material name="lab_wall" rgba="0.85 0.9 0.95 1" reflectance="0.1"/>
+
+    <!-- Object materials -->
+    <!-- Plastic cup: slightly off-white, low specular for plastic look -->
+    <material name="plastic_cup_mat" rgba="0.95 0.95 0.92 1"
+              specular="0.2" shininess="0.15" reflectance="0.05"/>
+    <!-- Bowl: ceramic-ish blue -->
+    <material name="bowl_mat" rgba="0.35 0.45 0.7 1"
+              specular="0.6" shininess="0.4" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <!-- Lighting -->
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <light pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.25 0.25 0.25"/>
+    <light pos="-2 2 3" dir="0.5 -0.5 -1" diffuse="0.2 0.2 0.2"/>
+    <light pos="0 -2 3" dir="0 0.5 -1" diffuse="0.2 0.2 0.2"/>
+
+    <geom name="floor" size="10 10 0.01" type="plane" material="groundplane"/>
+
+    <!--
+      Robot pedestal. Panda's link0 sits at world origin (the include
+      uses no explicit pos), so the pedestal lifts the table-relative
+      reference. Panda base ends up at z=0; we keep the table at z=0.42
+      because the panda has ~0.65m reach above its base.
+    -->
+    <body name="robot_pedestal" pos="0 0 -0.005">
+      <geom name="pedestal_base" type="box" size="0.18 0.18 0.005"
+            pos="0 0 0" material="pedestal_mat"/>
+    </body>
+
+    <!-- Main work table — top at z=0.42, centred at x=+0.55 (forward of base) -->
+    <body name="table" pos="0.55 0 0.40">
+      <geom name="table_top" type="box" size="0.5 0.4 0.02"
+            pos="0 0 0" material="table_mat"
+            friction="1 0.5 0.0001"/>
+      <geom name="table_leg1" type="cylinder" size="0.03 0.2"
+            pos="0.45 0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg2" type="cylinder" size="0.03 0.2"
+            pos="0.45 -0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg3" type="cylinder" size="0.03 0.2"
+            pos="-0.45 0.35 -0.2" material="table_mat"/>
+      <geom name="table_leg4" type="cylinder" size="0.03 0.2"
+            pos="-0.45 -0.35 -0.2" material="table_mat"/>
+    </body>
+
+    <!--
+      Plastic cup — solid-cylinder placeholder (MuJoCo primitive
+      cylinders are solid; hollow geometry would require a mesh
+      composed of contact shells). For the perception + grasp
+      pipeline this is fine: the SAM3 mask + OBB and the
+      grasp_se3 horizontal trajectory only use the outer
+      bounding cylinder.
+
+      Dimensions: 70mm OD (35mm radius), 110mm tall (55mm half-height).
+      Placement: +Y side of table (x=+0.55, y=+0.20), upright,
+      bottom resting on table_top at z=0.42 → centre at z=0.42+0.055=0.475.
+    -->
+    <body name="plastic_cup" pos="0.55 0.20 0.475">
+      <freejoint name="plastic_cup_free"/>
+      <geom name="plastic_cup_geom" type="cylinder" size="0.035 0.055"
+            material="plastic_cup_mat"
+            condim="6" friction="1 0.5 0.0001"
+            solimp="0.99 0.999 0.001" solref="0.01 1"/>
+      <inertial pos="0 0 0" mass="0.08"
+                diaginertia="0.00009 0.00009 0.00005"/>
+    </body>
+
+    <!--
+      Bowl — open shallow cylinder built from a thin floor disk +
+      4 wall arcs. Approximate hemisphere with a low cylinder
+      whose interior is hollow (open top). MuJoCo doesn't have a
+      built-in concave primitive, so we use 1 disk + 8 wall
+      segments (octagonal approximation) for a passable bowl.
+
+      Dimensions: 200mm OD (100mm radius), 80mm tall.
+      Placement: -Y side of table (x=+0.55, y=-0.20), upright,
+      bottom at z=0.42, top rim at z=0.50. Kept off the robot's
+      home-pose hand swept volume.
+    -->
+    <body name="bowl" pos="0.55 -0.20 0.42">
+      <!-- Bottom disk (thin) -->
+      <geom name="bowl_bottom" type="cylinder" size="0.1 0.005"
+            pos="0 0 0.005" material="bowl_mat"
+            condim="6" friction="0.9 0.4 0.001"
+            solimp="0.99 0.999 0.001" solref="0.01 1"/>
+
+      <!--
+        Octagonal wall: 8 thin box segments arranged around the rim.
+        Each wall: 78mm wide tangent (X=39mm half), 5mm radial thick
+        (Y=2.5mm half), 75mm tall (Z=37.5mm half). Center z=0.0425.
+        Rotation about Z: wall at polar angle theta has its box X-axis
+        TANGENT to the rim, i.e., perpendicular to the radial direction,
+        so euler-Z = theta + pi/2.
+      -->
+      <geom name="bowl_wall_0" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0975 0 0.0425" euler="0 0 1.5708"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_45" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 0.0689 0.0425" euler="0 0 2.3562"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_90" type="box" size="0.039 0.0025 0.0375"
+            pos="0 0.0975 0.0425" euler="0 0 3.1416"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_135" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 0.0689 0.0425" euler="0 0 3.9270"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_180" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0975 0 0.0425" euler="0 0 1.5708"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_225" type="box" size="0.039 0.0025 0.0375"
+            pos="-0.0689 -0.0689 0.0425" euler="0 0 2.3562"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_270" type="box" size="0.039 0.0025 0.0375"
+            pos="0 -0.0975 0.0425" euler="0 0 3.1416"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+      <geom name="bowl_wall_315" type="box" size="0.039 0.0025 0.0375"
+            pos="0.0689 -0.0689 0.0425" euler="0 0 3.9270"
+            material="bowl_mat" condim="6" friction="0.9 0.4 0.001"/>
+
+      <!-- Drop target site for pour primitive -->
+      <site name="bowl_target" pos="0 0 0.05"
+            size="0.08 0.08 0.001" rgba="0 0 0 0" type="box"/>
+    </body>
+
+    <!--
+      Cameras.
+
+      birdview: above-and-side, mimics real Kinect mounted on
+      a tripod looking down at the table. +Y offset and high z,
+      looking at the table centre.
+    -->
+    <body name="camera_birdview" pos="0.55 -0.7 1.35">
+      <camera name="birdview" fovy="50" pos="0 0 0"
+              xyaxes="1 0 0 0 0.6 0.8"/>
+    </body>
+
+    <!--
+      sideview: perpendicular to robot-table axis, table-level.
+      +Y side, looking inward (-Y direction).
+    -->
+    <body name="camera_sideview" pos="0.55 0.95 0.65">
+      <camera name="sideview" fovy="55" pos="0 0 0"
+              xyaxes="-1 0 0 0 -0.25 0.97"/>
+    </body>
+
+    <!-- Back wall for visual grounding -->
+    <body name="back_wall" pos="0 -1.6 1">
+      <geom name="wall_back" type="box" size="3 0.05 1" material="lab_wall"/>
+    </body>
+
+    <!-- Keypoint marker pool — kept for parity with perception_test_scene -->
+    <body name="keypoint_markers" pos="0 0 0">
+      <site name="keypoint_0" pos="0 0 -10" size="0.01" rgba="1 0 0 0" type="sphere"/>
+      <site name="keypoint_1" pos="0 0 -10" size="0.01" rgba="1 0.2 0 0" type="sphere"/>
+      <site name="keypoint_2" pos="0 0 -10" size="0.01" rgba="1 0.4 0 0" type="sphere"/>
+      <site name="keypoint_3" pos="0 0 -10" size="0.01" rgba="1 0.6 0 0" type="sphere"/>
+    </body>
+  </worldbody>
+
+  <!--
+    Home keyframe. Panda has 9 actuated DOF (7 arm + 2 finger via
+    tendon). Free objects: plastic_cup (7), bowl is fixed (no joint
+    since freejoint omitted would let it sit but we want it stable —
+    we DID give it walls but the bowl body itself has no freejoint
+    so it stays welded to world; same for table/pedestal).
+
+    qpos layout: [7 arm, 2 finger, 7 cup_freejoint] = 16
+    ctrl layout: [7 arm + 1 gripper] = 8
+  -->
+  <keyframe>
+    <key name="pour_start"
+         qpos="0 -0.3 0 -2.0 0 1.7 -0.7853  0.04 0.04  0.55 0.20 0.475 1 0 0 0"
+         ctrl="0 -0.3 0 -2.0 0 1.7 -0.7853  255"/>
+  </keyframe>
+
+</mujoco>

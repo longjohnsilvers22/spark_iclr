@@ -1,0 +1,44 @@
+# Task 5 of the human-parity demo set: "stack the gray block on the blue block".
+#
+# The mirror of stack_blue_on_gray.yaml. Same two objects, roles swapped.
+# The swap lives HERE, in the tree, not in perception: SAM3 emits the same
+# two labels for both tasks and the colour words carry the roles.
+instruction: "stack the gray block on the blue block"
+aliases:
+  - "stack the grey block on the blue block"
+  - "stack the grey block on a blue block"
+  - "put the gray block on the blue block"
+  - "stack gray block on blue block"
+objects: ["gray block", "blue block"]
+priority: 10
+promote: true
+verified: true
+provenance: >-
+  Captured from live-run library entry 8f5ff5dad2f9
+  ("stack the grey block on a blue block", success=1 fail=0). That run was
+  staged with two blue blocks so its target read "blue block 2"; the
+  instance suffix is dropped here because the human episodes for this task
+  stage exactly one of each. The label resolver binds a bare "blue block"
+  to whichever numbered instance exists if the scene is staged with more,
+  so the tree replays either way.
+notes: >-
+  If the rig is deliberately staged with two blue blocks, pin a numbered
+  variant instead -- "blue block" would bind to the lowest-numbered
+  instance, which may not be the one you mean.
+score:
+  task: "stack the gray block on the blue block"
+  tree:
+    type: sequence
+    children:
+      - type: move_to_keypoint
+        params: {keypoint_label: "gray block", offset_z: 0.0}
+      - type: grasp
+        params: {force: 60, target_width: 0.03}
+      - type: move_relative
+        params: {dx: 0.0, dy: 0.0, dz: 0.2}
+      - type: stack
+        params:
+          target_label: "blue block"
+          force_threshold: 15.0
+          max_descent: 0.25
+          clearance: 0.05
